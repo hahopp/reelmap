@@ -1,5 +1,16 @@
 'use client'
 
+import { useRef } from 'react'
+import Script from 'next/script'
+
+/* 카카오 지도 SDK 전역 (간략 타입) */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+declare global {
+  interface Window {
+    kakao: any
+  }
+}
+
 export interface MapMarker {
   id: string
   lat: number
@@ -8,23 +19,77 @@ export interface MapMarker {
 }
 
 export interface MapViewProps {
-  center: { lat: number; lng: number }
-  level?: number
   markers?: MapMarker[]
+  center?: { lat: number; lng: number }
+  level?: number
   onMapClick?: (coord: { lat: number; lng: number }) => void
   className?: string
 }
 
+const SEOUL = { lat: 37.5665, lng: 126.978 }
+
 /**
- * 지도 표시 단일 경계 — 카카오 SDK 호출은 이 컴포넌트 안에서만(제공자 교체 대비).
- * TODO(T2/T4): NEXT_PUBLIC_KAKAO_MAP_JS_KEY 로 카카오 Maps SDK 로드 후 실제 지도/마커 렌더.
+ * 지도 표시 단일 경계 — 카카오 Maps SDK 호출은 이 컴포넌트 안에서만(제공자 교체 대비).
+ * autoload=false 로 받고 kakao.maps.load() 안에서 초기화 (Next 16 Script onReady 패턴).
  */
-export default function MapView({ markers = [], className }: MapViewProps) {
-  return (
-    <div className={className}>
-      <div className="flex h-full min-h-64 w-full items-center justify-center rounded border border-dashed text-sm text-zinc-500">
-        지도 자리 (MapView) · 핀 {markers.length}개 · 카카오 SDK 연결 예정
+export default function MapView({
+  markers = [],
+  center,
+  level = 9,
+  onMapClick,
+  className,
+}: MapViewProps) {
+  const mapRef = useRef<HTMLDivElement | null>(null)
+  const jsKey = process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY
+
+  function initMap() {
+    const kakao = window.kakao
+    if (!kakao?.maps || !mapRef.current) return
+    kakao.maps.load(() => {
+      const c = center ?? markers[0] ?? SEOUL
+      const map = new kakao.maps.Map(mapRef.current, {
+        center: new kakao.maps.LatLng(c.lat, c.lng),
+        level,
+      })
+
+      const bounds = new kakao.maps.LatLngBounds()
+      markers.forEach((m) => {
+        const pos = new kakao.maps.LatLng(m.lat, m.lng)
+        const marker = new kakao.maps.Marker({ map, position: pos })
+        if (m.label) {
+          const iw = new kakao.maps.InfoWindow({
+            content: `<div style="padding:4px 8px;font-size:12px;white-space:nowrap;">${m.label}</div>`,
+          })
+          kakao.maps.event.addListener(marker, 'click', () => iw.open(map, marker))
+        }
+        bounds.extend(pos)
+      })
+      if (markers.length > 1) map.setBounds(bounds)
+
+      if (onMapClick) {
+        kakao.maps.event.addListener(map, 'click', (e: any) => {
+          onMapClick({ lat: e.latLng.getLat(), lng: e.latLng.getLng() })
+        })
+      }
+    })
+  }
+
+  if (!jsKey) {
+    return (
+      <div className={className} style={{ minHeight: 200 }}>
+        <p className="text-sm text-red-600">NEXT_PUBLIC_KAKAO_MAP_JS_KEY 가 설정되지 않았습니다.</p>
       </div>
-    </div>
+    )
+  }
+
+  return (
+    <>
+      <Script
+        src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${jsKey}&autoload=false`}
+        strategy="afterInteractive"
+        onReady={initMap}
+      />
+      <div ref={mapRef} className={className} style={{ width: '100%', height: 360 }} />
+    </>
   )
 }

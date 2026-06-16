@@ -4,6 +4,7 @@ import { getMap } from '@/lib/maps'
 import { listMapPins } from '@/lib/pins'
 import { removePinAction } from './actions'
 import PlaceRegister from './PlaceRegister'
+import MapView from '@/components/map/MapView'
 
 export default async function MapDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -25,6 +26,13 @@ export default async function MapDetailPage({ params }: { params: Promise<{ id: 
       </div>
 
       <PlaceRegister mapId={map.id} />
+
+      {pins.length > 0 && (
+        <MapView
+          className="rounded border"
+          markers={pins.map((p) => ({ id: p.pinId, lat: p.lat, lng: p.lng, label: p.name }))}
+        />
+      )}
 
       <div className="flex flex-col gap-2">
         <h2 className="font-semibold">담긴 장소 ({pins.length})</h2>
