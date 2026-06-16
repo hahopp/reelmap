@@ -27,6 +27,42 @@ export async function getPublicMap(shareToken: string): Promise<PublicMap | null
   }
 }
 
+export interface SeedMapSummary {
+  shareToken: string
+  title: string
+  description: string | null
+  pinCount: number
+}
+
+/** 공개 시드맵 목록 + 핀 수 (홈/탐색용, anon 클라이언트) */
+export async function listSeedMaps(): Promise<SeedMapSummary[]> {
+  const db = createAnonClient()
+  const { data: maps, error } = await db
+    .from('map')
+    .select('id, share_token, title, description')
+    .eq('is_seed', true)
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(error.message)
+  if (!maps || maps.length === 0) return []
+
+  const ids = maps.map((m) => m.id as string)
+  const { data: pins, error: pe } = await db.from('map_pin').select('map_id').in('map_id', ids)
+  if (pe) throw new Error(pe.message)
+
+  const countByMap = new Map<string, number>()
+  for (const p of pins ?? []) {
+    const k = p.map_id as string
+    countByMap.set(k, (countByMap.get(k) ?? 0) + 1)
+  }
+
+  return maps.map((m) => ({
+    shareToken: m.share_token as string,
+    title: m.title as string,
+    description: (m.description as string | null) ?? null,
+    pinCount: countByMap.get(m.id as string) ?? 0,
+  }))
+}
+
 /** 공개 지도의 핀 목록 (anon 클라이언트, RLS 적용) */
 export async function listPublicMapPins(mapId: string): Promise<PinRow[]> {
   const db = createAnonClient()
