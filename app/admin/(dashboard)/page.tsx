@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { ADMIN_COOKIE } from '@/lib/admin/auth'
@@ -52,7 +53,9 @@ export default async function AdminHomePage() {
         {maps.map((m) => (
           <div key={m.id} className="flex items-center justify-between rounded border p-3">
             <div className="flex flex-col">
-              <span className="font-medium">{m.title}</span>
+              <Link href={`/admin/maps/${m.id}`} className="font-medium underline">
+                {m.title}
+              </Link>
               <span className="text-xs text-zinc-500">
                 {m.visibility === 'unlisted' ? '링크공유' : '비공개'}
                 {m.is_seed && ' · 🏕 시드맵'}
