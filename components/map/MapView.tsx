@@ -2,6 +2,7 @@
 
 import { useRef } from 'react'
 import Script from 'next/script'
+import { cn } from '@/lib/utils'
 
 /* 카카오 지도 SDK 전역 (간략 타입) */
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -89,7 +90,7 @@ export default function MapView({
         strategy="afterInteractive"
         onReady={initMap}
       />
-      <div ref={mapRef} className={className} style={{ width: '100%', height: 360 }} />
+      <div ref={mapRef} className={cn('h-[360px] w-full', className)} />
     </>
   )
 }
