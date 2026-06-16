@@ -52,7 +52,12 @@ export default async function Home() {
                   <div
                     className={`flex h-32 items-center justify-center bg-gradient-to-br ${COVERS[i % COVERS.length]}`}
                   >
-                    <span className="text-5xl drop-shadow-sm">{EMOJIS[i % EMOJIS.length]}</span>
+                    {m.coverImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={m.coverImageUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-5xl drop-shadow-sm">{EMOJIS[i % EMOJIS.length]}</span>
+                    )}
                   </div>
                   {/* 본문 */}
                   <div className="flex flex-col gap-1.5 p-4">

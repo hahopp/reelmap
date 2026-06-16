@@ -5,6 +5,7 @@ import { requireAdmin } from '@/lib/admin/auth'
 import { searchPlaces } from '@/lib/places'
 import type { NormalizedPlace } from '@/lib/places/types'
 import { registerSeedPlaceToMap, removeMapPin } from '@/lib/pins'
+import { updateMap } from '@/lib/maps'
 
 export async function searchPlacesAction(query: string): Promise<NormalizedPlace[]> {
   await requireAdmin()
@@ -35,4 +36,19 @@ export async function removePinAction(formData: FormData) {
   if (!pinId) return
   await removeMapPin(pinId)
   revalidatePath(`/admin/maps/${mapId}`)
+}
+
+export async function updateMapAction(formData: FormData) {
+  await requireAdmin()
+  const id = String(formData.get('id') ?? '')
+  if (!id) return
+  const title = String(formData.get('title') ?? '').trim()
+  await updateMap(id, {
+    title: title || undefined,
+    description: String(formData.get('description') ?? '').trim() || null,
+    visibility: formData.get('visibility') === 'unlisted' ? 'unlisted' : 'private',
+    coverImageUrl: String(formData.get('coverImageUrl') ?? '').trim() || null,
+  })
+  revalidatePath(`/admin/maps/${id}`)
+  revalidatePath('/')
 }

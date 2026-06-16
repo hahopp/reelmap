@@ -31,6 +31,7 @@ export interface SeedMapSummary {
   shareToken: string
   title: string
   description: string | null
+  coverImageUrl: string | null
   pinCount: number
 }
 
@@ -39,7 +40,7 @@ export async function listSeedMaps(): Promise<SeedMapSummary[]> {
   const db = createAnonClient()
   const { data: maps, error } = await db
     .from('map')
-    .select('id, share_token, title, description')
+    .select('*')
     .eq('is_seed', true)
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
@@ -59,6 +60,7 @@ export async function listSeedMaps(): Promise<SeedMapSummary[]> {
     shareToken: m.share_token as string,
     title: m.title as string,
     description: (m.description as string | null) ?? null,
+    coverImageUrl: (m.cover_image_url as string | null) ?? null,
     pinCount: countByMap.get(m.id as string) ?? 0,
   }))
 }

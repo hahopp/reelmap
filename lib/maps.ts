@@ -10,6 +10,7 @@ export interface MapRow {
   visibility: MapVisibility
   is_seed: boolean
   share_token: string
+  cover_image_url: string | null
   created_at: string
 }
 
@@ -59,6 +60,7 @@ export async function updateMap(
     description?: string | null
     visibility?: MapVisibility
     isSeed?: boolean
+    coverImageUrl?: string | null
   },
 ): Promise<void> {
   const db = createAdminClient()
@@ -67,6 +69,7 @@ export async function updateMap(
   if (patch.description !== undefined) row.description = patch.description
   if (patch.visibility !== undefined) row.visibility = patch.visibility
   if (patch.isSeed !== undefined) row.is_seed = patch.isSeed
+  if (patch.coverImageUrl !== undefined) row.cover_image_url = patch.coverImageUrl
   const { error } = await db.from('map').update(row).eq('id', id)
   if (error) throw new Error(error.message)
 }

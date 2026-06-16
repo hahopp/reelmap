@@ -2,11 +2,13 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getMap } from '@/lib/maps'
 import { listMapPins } from '@/lib/pins'
-import { removePinAction } from './actions'
+import { removePinAction, updateMapAction } from './actions'
 import PlaceRegister from './PlaceRegister'
 import MapView from '@/components/map/MapView'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export default async function MapDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -43,6 +45,51 @@ export default async function MapDetailPage({ params }: { params: Promise<{ id: 
           </span>
         )}
       </div>
+
+      {/* 지도 정보 수정 (제목·설명·커버·공개범위) */}
+      <details className="rounded-lg border bg-card">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">지도 정보 수정</summary>
+        <form action={updateMapAction} className="flex flex-col gap-3 border-t p-4">
+          <input type="hidden" name="id" value={map.id} />
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="m-title">제목</Label>
+            <Input id="m-title" name="title" defaultValue={map.title} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="m-desc">설명</Label>
+            <Input
+              id="m-desc"
+              name="description"
+              defaultValue={map.description ?? ''}
+              placeholder="이 지도 설명"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="m-cover">커버 이미지 URL</Label>
+            <Input
+              id="m-cover"
+              name="coverImageUrl"
+              defaultValue={map.cover_image_url ?? ''}
+              placeholder="https://....jpg"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="m-vis">공개범위</Label>
+            <select
+              id="m-vis"
+              name="visibility"
+              defaultValue={map.visibility}
+              className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+            >
+              <option value="private">비공개</option>
+              <option value="unlisted">링크공유</option>
+            </select>
+          </div>
+          <Button type="submit" className="self-start">
+            저장
+          </Button>
+        </form>
+      </details>
 
       <PlaceRegister mapId={map.id} />
 
