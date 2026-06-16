@@ -1,6 +1,16 @@
 import Link from 'next/link'
 import { listSeedMaps } from '@/lib/public-maps'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+
+// 커버 장식 (실사진 아님 — 그라데이션 + 이모지). index로 순환.
+const COVERS = [
+  'from-emerald-200 to-green-300',
+  'from-amber-100 to-orange-200',
+  'from-sky-200 to-cyan-300',
+  'from-lime-200 to-emerald-300',
+  'from-rose-100 to-amber-200',
+  'from-teal-200 to-emerald-300',
+]
+const EMOJIS = ['🏕', '🌄', '💧', '🌲', '🔥', '⛺']
 
 export default async function Home() {
   const maps = await listSeedMaps()
@@ -30,24 +40,31 @@ export default async function Home() {
             아직 공개된 지도가 없어요.
           </p>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {maps.map((m) => (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {maps.map((m, i) => (
               <Link
                 key={m.shareToken}
                 href={`/m/${m.shareToken}`}
-                className="group rounded-xl focus-visible:outline-2 focus-visible:outline-ring"
+                className="group block rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               >
-                <Card className="h-full transition group-hover:ring-foreground/25">
-                  <CardHeader>
-                    <CardTitle className="text-base">🏕 {m.title}</CardTitle>
-                    <CardDescription className="line-clamp-2 leading-relaxed text-foreground/70">
+                <article className="h-full overflow-hidden rounded-2xl border bg-card ring-1 ring-foreground/5 transition duration-200 group-hover:scale-[1.03] group-hover:shadow-xl group-hover:ring-foreground/15">
+                  {/* 커버 */}
+                  <div
+                    className={`flex h-32 items-center justify-center bg-gradient-to-br ${COVERS[i % COVERS.length]}`}
+                  >
+                    <span className="text-5xl drop-shadow-sm">{EMOJIS[i % EMOJIS.length]}</span>
+                  </div>
+                  {/* 본문 */}
+                  <div className="flex flex-col gap-1.5 p-4">
+                    <h3 className="font-semibold leading-snug">{m.title}</h3>
+                    <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
                       {m.description || '설명이 아직 없어요'}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="mt-auto">
-                    <span className="text-xs font-medium text-primary">캠핑장 {m.pinCount}곳 →</span>
-                  </CardContent>
-                </Card>
+                    </p>
+                    <span className="mt-1 text-xs font-medium text-primary">
+                      캠핑장 {m.pinCount}곳 →
+                    </span>
+                  </div>
+                </article>
               </Link>
             ))}
           </div>
