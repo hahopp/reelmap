@@ -4,6 +4,10 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { NormalizedPlace } from '@/lib/places/types'
 import { searchPlacesAction, addPlaceAction } from './actions'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 
 export default function PlaceRegister({ mapId }: { mapId: string }) {
   const router = useRouter()
@@ -48,74 +52,72 @@ export default function PlaceRegister({ mapId }: { mapId: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded border p-4">
-      <h2 className="font-semibold">장소 등록</h2>
+    <Card>
+      <CardHeader>
+        <CardTitle>장소 등록</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="ig-url">인스타그램 링크</Label>
+          <Input
+            id="ig-url"
+            value={instagramUrl}
+            onChange={(e) => setInstagramUrl(e.target.value)}
+            placeholder="https://www.instagram.com/reel/XXXX/"
+          />
+        </div>
 
-      <label className="flex flex-col gap-1 text-sm">
-        인스타그램 링크
-        <input
-          value={instagramUrl}
-          onChange={(e) => setInstagramUrl(e.target.value)}
-          placeholder="https://www.instagram.com/reel/XXXX/"
-          className="rounded border px-3 py-2"
+        <div className="flex gap-2">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                doSearch()
+              }
+            }}
+            placeholder="캠핑장 이름 검색 (예: 가평 글램핑)"
+          />
+          <Button type="button" onClick={doSearch} disabled={searching} className="shrink-0">
+            {searching ? '검색중…' : '검색'}
+          </Button>
+        </div>
+
+        <Input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="메모 (선택)"
         />
-      </label>
 
-      <div className="flex gap-2">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              doSearch()
-            }
-          }}
-          placeholder="캠핑장 이름 검색 (예: 가평 글램핑)"
-          className="flex-1 rounded border px-3 py-2"
-        />
-        <button
-          type="button"
-          onClick={doSearch}
-          disabled={searching}
-          className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-        >
-          {searching ? '검색중…' : '검색'}
-        </button>
-      </div>
+        {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
 
-      <input
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        placeholder="메모 (선택)"
-        className="rounded border px-3 py-2 text-sm"
-      />
-
-      {msg && <p className="text-sm text-zinc-600">{msg}</p>}
-
-      {results.length > 0 && (
-        <ul className="flex flex-col gap-1">
-          {results.map((r) => (
-            <li
-              key={`${r.provider}:${r.externalId ?? r.name}`}
-              className="flex items-center justify-between rounded border px-3 py-2"
-            >
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">{r.name}</span>
-                <span className="text-xs text-zinc-500">{r.roadAddress || r.address}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => addPlace(r)}
-                disabled={isPending}
-                className="rounded border px-2 py-1 text-xs disabled:opacity-50"
+        {results.length > 0 && (
+          <ul className="flex flex-col gap-1.5">
+            {results.map((r) => (
+              <li
+                key={`${r.provider}:${r.externalId ?? r.name}`}
+                className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2"
               >
-                추가
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">{r.name}</span>
+                  <span className="text-xs text-muted-foreground">{r.roadAddress || r.address}</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => addPlace(r)}
+                  disabled={isPending}
+                  className="shrink-0"
+                >
+                  추가
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
   )
 }

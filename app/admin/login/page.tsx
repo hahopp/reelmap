@@ -1,6 +1,9 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { ADMIN_COOKIE, adminSessionToken, isValidAdminPassword } from '@/lib/admin/auth'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 export const metadata = { title: 'ReelMap 어드민 로그인' }
 
@@ -23,20 +26,20 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-[60vh] max-w-sm flex-col justify-center gap-4 p-6">
-      <h1 className="text-xl font-semibold">ReelMap 어드민</h1>
-      <form action={login} className="flex flex-col gap-3">
-        <input
-          name="password"
-          type="password"
-          placeholder="어드민 비밀번호"
-          autoFocus
-          className="rounded border px-3 py-2"
-        />
-        <button type="submit" className="rounded bg-black px-3 py-2 text-white">
-          로그인
-        </button>
-      </form>
+    <main className="mx-auto flex min-h-[70vh] w-full max-w-sm flex-col justify-center p-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">🏕 ReelMap 어드민</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form action={login} className="flex flex-col gap-3">
+            <Input name="password" type="password" placeholder="어드민 비밀번호" autoFocus />
+            <Button type="submit" size="lg" className="w-full">
+              로그인
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </main>
   )
 }
