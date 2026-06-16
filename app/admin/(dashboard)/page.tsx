@@ -1,8 +1,12 @@
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { ADMIN_COOKIE } from '@/lib/admin/auth'
+import { listMaps } from '@/lib/maps'
+import { createMapAction, deleteMapAction, toggleSeedAction } from './actions'
 
-export default function AdminHomePage() {
+export default async function AdminHomePage() {
+  const maps = await listMaps()
+
   async function logout() {
     'use server'
     const store = await cookies()
@@ -11,20 +15,65 @@ export default function AdminHomePage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">어드민 콘솔</h1>
+        <h1 className="text-2xl font-bold">어드민 — 지도</h1>
         <form action={logout}>
           <button className="text-sm text-zinc-500 underline">로그아웃</button>
         </form>
       </div>
-      <p className="text-zinc-600">시드 도구 골격입니다. 키 연결 후 아래 기능을 붙입니다.</p>
-      <ul className="list-disc pl-5 text-sm text-zinc-600">
-        <li>지도 CRUD (생성/수정/삭제) — T2</li>
-        <li>인스타 링크 + 장소 등록 (카카오 검색 → 좌표 확정 → dedup) — T2</li>
-        <li>지도에 핀 추가/제거 — T2</li>
-        <li>기획전 public 시드맵 구축 — T3</li>
-      </ul>
+
+      {/* 새 지도 생성 */}
+      <form action={createMapAction} className="flex flex-col gap-2 rounded border p-4">
+        <h2 className="font-semibold">새 지도</h2>
+        <input
+          name="title"
+          placeholder="지도 이름 (예: 봄 감성 캠핑장)"
+          required
+          className="rounded border px-3 py-2"
+        />
+        <input name="description" placeholder="설명 (선택)" className="rounded border px-3 py-2" />
+        <div className="flex items-center gap-4 text-sm">
+          <label className="flex items-center gap-1">
+            <input type="checkbox" name="isSeed" /> 시드맵(공개 노출)
+          </label>
+          <select name="visibility" className="rounded border px-2 py-1">
+            <option value="private">비공개</option>
+            <option value="unlisted">링크공유</option>
+          </select>
+        </div>
+        <button className="self-start rounded bg-black px-3 py-2 text-white">만들기</button>
+      </form>
+
+      {/* 지도 목록 */}
+      <div className="flex flex-col gap-2">
+        <h2 className="font-semibold">지도 목록 ({maps.length})</h2>
+        {maps.length === 0 && <p className="text-sm text-zinc-500">아직 지도가 없습니다.</p>}
+        {maps.map((m) => (
+          <div key={m.id} className="flex items-center justify-between rounded border p-3">
+            <div className="flex flex-col">
+              <span className="font-medium">{m.title}</span>
+              <span className="text-xs text-zinc-500">
+                {m.visibility === 'unlisted' ? '링크공유' : '비공개'}
+                {m.is_seed && ' · 🏕 시드맵'}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <form action={toggleSeedAction}>
+                <input type="hidden" name="id" value={m.id} />
+                <input type="hidden" name="isSeed" value={String(m.is_seed)} />
+                <button className="text-xs text-zinc-600 underline">
+                  {m.is_seed ? '시드 해제' : '시드 지정'}
+                </button>
+              </form>
+              <form action={deleteMapAction}>
+                <input type="hidden" name="id" value={m.id} />
+                <button className="text-xs text-red-600 underline">삭제</button>
+              </form>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

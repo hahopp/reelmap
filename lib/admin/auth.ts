@@ -1,5 +1,6 @@
 import 'server-only'
 import { createHmac, timingSafeEqual } from 'node:crypto'
+import { cookies } from 'next/headers'
 
 export const ADMIN_COOKIE = 'reelmap_admin'
 
@@ -27,4 +28,12 @@ export function isValidAdminSession(token: string | undefined): boolean {
   const a = Buffer.from(token)
   const b = Buffer.from(adminSessionToken())
   return a.length === b.length && timingSafeEqual(a, b)
+}
+
+/** 서버 액션 진입점에서 호출 — 유효한 어드민 세션이 아니면 throw (직접 POST 방어). */
+export async function requireAdmin(): Promise<void> {
+  const store = await cookies()
+  if (!isValidAdminSession(store.get(ADMIN_COOKIE)?.value)) {
+    throw new Error('Unauthorized')
+  }
 }
