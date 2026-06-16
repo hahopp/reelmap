@@ -23,6 +23,20 @@ export default async function MapDetailPage({ params }: { params: Promise<{ id: 
           {map.visibility === 'unlisted' ? '링크공유' : '비공개'}
           {map.is_seed && ' · 🏕 시드맵'}
         </p>
+        {map.is_seed || map.visibility === 'unlisted' ? (
+          <a
+            href={`/m/${map.share_token}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-blue-600 underline"
+          >
+            공개 페이지 열기 ↗
+          </a>
+        ) : (
+          <span className="text-xs text-zinc-400">
+            공개하려면 시드 지정 또는 링크공유로 설정하세요
+          </span>
+        )}
       </div>
 
       <PlaceRegister mapId={map.id} />
