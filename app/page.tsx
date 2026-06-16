@@ -14,13 +14,17 @@ export default async function Home() {
         <p className="max-w-md text-balance text-muted-foreground">
           인스타에서 본 그 캠핑장, 어디인지 궁금했죠?
           <br />
-          감성 캠핑장을 지도에 모았어요.
+          감성 캠핑장을 주제별 지도로 모았어요.
         </p>
       </section>
 
-      {/* 둘러보기 */}
+      {/* 큐레이션 지도 둘러보기 */}
       <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold">큐레이션 지도 둘러보기</h2>
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-lg font-semibold">큐레이션 지도</h2>
+          <span className="text-sm text-muted-foreground">{maps.length}개</span>
+        </div>
+
         {maps.length === 0 ? (
           <p className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
             아직 공개된 지도가 없어요.
@@ -33,13 +37,15 @@ export default async function Home() {
                 href={`/m/${m.shareToken}`}
                 className="group rounded-xl focus-visible:outline-2 focus-visible:outline-ring"
               >
-                <Card className="h-full transition group-hover:ring-foreground/20">
+                <Card className="h-full transition group-hover:ring-foreground/25">
                   <CardHeader>
-                    <CardTitle>🏕 {m.title}</CardTitle>
-                    {m.description && <CardDescription>{m.description}</CardDescription>}
+                    <CardTitle className="text-base">🏕 {m.title}</CardTitle>
+                    <CardDescription className="line-clamp-2 leading-relaxed text-foreground/70">
+                      {m.description || '설명이 아직 없어요'}
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent className="text-sm text-muted-foreground">
-                    캠핑장 {m.pinCount}곳
+                  <CardContent className="mt-auto">
+                    <span className="text-xs font-medium text-primary">캠핑장 {m.pinCount}곳 →</span>
                   </CardContent>
                 </Card>
               </Link>
