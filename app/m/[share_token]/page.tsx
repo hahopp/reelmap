@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import MapView from '@/components/map/MapView'
 import { getPublicMap, listPublicMapPins } from '@/lib/public-maps'
@@ -20,8 +21,15 @@ export default async function PublicMapPage({
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="flex items-center gap-1.5 border-b bg-card/70 px-4 py-3 backdrop-blur">
-        <span className="text-sm font-semibold tracking-tight">🏕 ReelMap</span>
+      <header className="flex items-center border-b bg-card/70 px-4 py-3 backdrop-blur">
+        <Link
+          href="/"
+          aria-label="홈으로 돌아가기"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <span aria-hidden className="text-base leading-none">←</span>
+          <span className="font-semibold tracking-tight text-foreground">🏕 ReelMap</span>
+        </Link>
       </header>
 
       {/* 모바일: 세로 스택(지도 위·목록 아래) / 데스크탑: 좌우분할(목록 왼쪽·지도 오른쪽 고정) */}
