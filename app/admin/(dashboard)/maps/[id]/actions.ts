@@ -6,7 +6,7 @@ import { searchPlaces } from '@/lib/places'
 import { kakaoWcongToWgs84 } from '@/lib/places/kakao'
 import type { NormalizedPlace } from '@/lib/places/types'
 import { parseKakaoMapUrl } from '@/lib/kakao-url'
-import { registerSeedPlaceToMap, removeMapPin, setPlaceTags } from '@/lib/pins'
+import { registerSeedPlaceToMap, removeMapPin, setPlaceTags, setPinNote } from '@/lib/pins'
 import { updateMap } from '@/lib/maps'
 import { parseTags } from '@/lib/tags'
 
@@ -86,4 +86,13 @@ export async function updatePlaceTagsAction(formData: FormData) {
   await setPlaceTags(placeId, parseTags(String(formData.get('tags') ?? '')))
   revalidatePath(`/admin/maps/${mapId}`)
   revalidatePath('/explore')
+}
+
+export async function updatePinNoteAction(formData: FormData) {
+  await requireAdmin()
+  const pinId = String(formData.get('pinId') ?? '')
+  const mapId = String(formData.get('mapId') ?? '')
+  if (!pinId) return
+  await setPinNote(pinId, String(formData.get('note') ?? '').trim())
+  revalidatePath(`/admin/maps/${mapId}`)
 }

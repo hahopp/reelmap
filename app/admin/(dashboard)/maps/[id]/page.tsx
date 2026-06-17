@@ -2,7 +2,12 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getMap } from '@/lib/maps'
 import { listMapPins } from '@/lib/pins'
-import { removePinAction, updateMapAction, updatePlaceTagsAction } from './actions'
+import {
+  removePinAction,
+  updateMapAction,
+  updatePlaceTagsAction,
+  updatePinNoteAction,
+} from './actions'
 import PlaceRegister from './PlaceRegister'
 import MapView from '@/components/map/MapView'
 import { Badge } from '@/components/ui/badge'
@@ -114,6 +119,7 @@ export default async function MapDetailPage({ params }: { params: Promise<{ id: 
                   {p.roadAddress || p.address}
                   {p.contentId && ` · 🔗 ${p.contentId}`}
                 </span>
+                {p.note && <span className="text-xs text-muted-foreground">📝 {p.note}</span>}
                 {p.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {p.tags.map((t) => (
@@ -136,13 +142,21 @@ export default async function MapDetailPage({ params }: { params: Promise<{ id: 
               </form>
             </div>
             <details className="mt-2">
-              <summary className="cursor-pointer text-xs text-muted-foreground">태그 수정</summary>
+              <summary className="cursor-pointer text-xs text-muted-foreground">태그·메모 수정</summary>
               <form action={updatePlaceTagsAction} className="mt-2 flex gap-2">
                 <input type="hidden" name="placeId" value={p.placeId} />
                 <input type="hidden" name="mapId" value={map.id} />
                 <Input name="tags" defaultValue={p.tags.join(' ')} placeholder="#키즈 #수도권 ..." />
                 <Button type="submit" size="sm" className="shrink-0">
-                  저장
+                  태그 저장
+                </Button>
+              </form>
+              <form action={updatePinNoteAction} className="mt-2 flex gap-2">
+                <input type="hidden" name="pinId" value={p.pinId} />
+                <input type="hidden" name="mapId" value={map.id} />
+                <Input name="note" defaultValue={p.note ?? ''} placeholder="메모" />
+                <Button type="submit" size="sm" variant="outline" className="shrink-0">
+                  메모 저장
                 </Button>
               </form>
             </details>

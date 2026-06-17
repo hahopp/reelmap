@@ -58,3 +58,30 @@ export async function kakaoWcongToWgs84(x: number, y: number): Promise<{ lat: nu
   if (!d) throw new Error('좌표 변환 결과가 없습니다')
   return { lat: d.y, lng: d.x }
 }
+
+/** WGS84 좌표 → 주소 (공식 coord2address API). 지번/도로명 둘 다 반환. */
+export async function kakaoCoord2Address(
+  lng: number,
+  lat: number,
+): Promise<{ address: string | null; roadAddress: string | null }> {
+  const key = process.env.KAKAO_REST_API_KEY
+  if (!key) throw new Error('Missing env: KAKAO_REST_API_KEY')
+
+  const url = new URL('https://dapi.kakao.com/v2/local/geo/coord2address.json')
+  url.searchParams.set('x', String(lng))
+  url.searchParams.set('y', String(lat))
+
+  const res = await fetch(url, { headers: { Authorization: `KakaoAK ${key}` } })
+  if (!res.ok) throw new Error(`주소 조회 실패: ${res.status}`)
+  const data = (await res.json()) as {
+    documents: {
+      road_address: { address_name: string } | null
+      address: { address_name: string } | null
+    }[]
+  }
+  const d = data.documents[0]
+  return {
+    address: d?.address?.address_name ?? null,
+    roadAddress: d?.road_address?.address_name ?? null,
+  }
+}

@@ -1,6 +1,7 @@
 import 'server-only'
 import { createAdminClient, OPERATOR_USER_ID } from './supabase/server'
 import { normalizeInstagramUrl } from './instagram'
+import { kakaoCoord2Address } from './places/kakao'
 import type { NormalizedPlace } from './places/types'
 
 export interface PinRow {
@@ -70,6 +71,19 @@ export async function registerSeedPlaceToMap(input: {
   const db = createAdminClient()
   const p = input.place
 
+  // 주소가 없으면 좌표로 역지오코딩해서 채움
+  let address = p.address
+  let roadAddress = p.roadAddress
+  if (!address && !roadAddress) {
+    try {
+      const a = await kakaoCoord2Address(p.lng, p.lat)
+      address = a.address
+      roadAddress = a.roadAddress
+    } catch {
+      // 주소 조회 실패는 무시 (좌표만으로도 등록)
+    }
+  }
+
   // 1) content 업서트
   const { error: ce } = await db
     .from('content')
@@ -99,8 +113,8 @@ export async function registerSeedPlaceToMap(input: {
           type_key: input.typeKey ?? 'general',
           external_provider: p.provider,
           external_place_id: p.externalId,
-          address: p.address,
-          road_address: p.roadAddress,
+          address,
+          road_address: roadAddress,
           created_by: OPERATOR_USER_ID,
         })
         .select('id')
@@ -117,8 +131,8 @@ export async function registerSeedPlaceToMap(input: {
         lng: p.lng,
         category: 'camping',
         type_key: input.typeKey ?? 'general',
-        address: p.address,
-        road_address: p.roadAddress,
+        address,
+        road_address: roadAddress,
         created_by: OPERATOR_USER_ID,
       })
       .select('id')
@@ -164,5 +178,12 @@ export async function removeMapPin(pinId: string): Promise<void> {
 export async function setPlaceTags(placeId: string, tags: string[]): Promise<void> {
   const db = createAdminClient()
   const { error } = await db.from('place').update({ tags }).eq('id', placeId)
+  if (error) throw new Error(error.message)
+}
+
+/** 핀의 메모 수정 (map_pin.note) */
+export async function setPinNote(pinId: string, note: string): Promise<void> {
+  const db = createAdminClient()
+  const { error } = await db.from('map_pin').update({ note: note || null }).eq('id', pinId)
   if (error) throw new Error(error.message)
 }
