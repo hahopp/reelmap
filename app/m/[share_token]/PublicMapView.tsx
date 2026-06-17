@@ -62,7 +62,7 @@ export default function PublicMapView({
             className="h-full w-full"
             markers={markers}
             focus={focus}
-            focusLevel={5}
+            focusLevel={8}
             onMarkerClick={handleMarkerClick}
           />
         ) : (
