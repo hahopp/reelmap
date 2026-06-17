@@ -55,7 +55,11 @@ export default async function MapDetailPage({ params }: { params: Promise<{ id: 
       {/* 지도 정보 수정 (제목·설명·커버·공개범위) */}
       <details className="rounded-lg border bg-card">
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium">지도 정보 수정</summary>
-        <form action={updateMapAction} className="flex flex-col gap-3 border-t p-4">
+        <form
+          action={updateMapAction}
+          key={`${map.title}|${map.description ?? ''}|${map.cover_image_url ?? ''}|${map.visibility}`}
+          className="flex flex-col gap-3 border-t p-4"
+        >
           <input type="hidden" name="id" value={map.id} />
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="m-title">제목</Label>
@@ -153,7 +157,11 @@ export default async function MapDetailPage({ params }: { params: Promise<{ id: 
               <summary className="cursor-pointer text-xs text-muted-foreground">
                 태그·메모·링크 수정
               </summary>
-              <form action={updatePlaceTagsAction} className="mt-2 flex gap-2">
+              <form
+                action={updatePlaceTagsAction}
+                key={`tags-${p.tags.join(',')}`}
+                className="mt-2 flex gap-2"
+              >
                 <input type="hidden" name="placeId" value={p.placeId} />
                 <input type="hidden" name="mapId" value={map.id} />
                 <Input name="tags" defaultValue={p.tags.join(' ')} placeholder="#키즈 #수도권 ..." />
@@ -161,7 +169,11 @@ export default async function MapDetailPage({ params }: { params: Promise<{ id: 
                   태그 저장
                 </Button>
               </form>
-              <form action={updatePinNoteAction} className="mt-2 flex gap-2">
+              <form
+                action={updatePinNoteAction}
+                key={`note-${p.note ?? ''}`}
+                className="mt-2 flex gap-2"
+              >
                 <input type="hidden" name="pinId" value={p.pinId} />
                 <input type="hidden" name="mapId" value={map.id} />
                 <Input name="note" defaultValue={p.note ?? ''} placeholder="메모" />
@@ -169,7 +181,11 @@ export default async function MapDetailPage({ params }: { params: Promise<{ id: 
                   메모 저장
                 </Button>
               </form>
-              <form action={updatePinContentAction} className="mt-2 flex gap-2">
+              <form
+                action={updatePinContentAction}
+                key={`link-${p.contentId ?? ''}`}
+                className="mt-2 flex gap-2"
+              >
                 <input type="hidden" name="pinId" value={p.pinId} />
                 <input type="hidden" name="placeId" value={p.placeId} />
                 <input type="hidden" name="mapId" value={map.id} />
