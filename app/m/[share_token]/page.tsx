@@ -28,7 +28,7 @@ export default async function PublicMapPage({
           className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <span aria-hidden className="text-base leading-none">←</span>
-          <span className="font-semibold tracking-tight text-foreground">🏕 ReelMap</span>
+          <span className="font-semibold tracking-tight text-foreground">📍 ReelMap</span>
         </Link>
       </header>
 
@@ -50,10 +50,10 @@ export default async function PublicMapPage({
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">{map.title}</h1>
-              {map.isSeed && <Badge variant="secondary">🏕 큐레이션</Badge>}
+              {map.isSeed && <Badge variant="secondary">📍 큐레이션</Badge>}
             </div>
             {map.description && <p className="text-muted-foreground">{map.description}</p>}
-            <p className="text-sm text-muted-foreground">캠핑장 {pins.length}곳</p>
+            <p className="text-sm text-muted-foreground">장소 {pins.length}곳</p>
           </div>
 
           {pins.length === 0 ? (

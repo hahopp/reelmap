@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "ReelMap",
-  description: "인스타그램 링크로 캠핑장 위치를 찾아 지도에 모으는 서비스",
+  description: "인스타에서 본 장소를 찾아 주제별 지도에 모으는 서비스",
 };
 
 export default function RootLayout({

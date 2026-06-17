@@ -19,12 +19,12 @@ export default async function Home() {
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-12 px-5 py-12 sm:py-16">
       {/* 히어로 */}
       <section className="flex flex-col items-center gap-3 text-center">
-        <span className="text-4xl">🏕</span>
+        <span className="text-4xl">📍</span>
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">ReelMap</h1>
         <p className="max-w-md text-balance text-muted-foreground">
-          인스타에서 본 그 캠핑장, 어디인지 궁금했죠?
+          인스타에서 본 그 장소, 어디인지 궁금하셨죠?
           <br />
-          감성 캠핑장을 주제별 지도로 모았어요.
+          주제별로 지도를 모았어요.
         </p>
       </section>
 
@@ -66,7 +66,7 @@ export default async function Home() {
                       {m.description || '설명이 아직 없어요'}
                     </p>
                     <span className="mt-1 text-xs font-medium text-primary">
-                      캠핑장 {m.pinCount}곳 →
+                      장소 {m.pinCount}곳 →
                     </span>
                   </div>
                 </article>

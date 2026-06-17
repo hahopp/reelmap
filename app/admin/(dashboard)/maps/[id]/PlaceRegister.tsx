@@ -85,7 +85,7 @@ export default function PlaceRegister({ mapId }: { mapId: string }) {
                 doSearch()
               }
             }}
-            placeholder="캠핑장 이름 검색 (예: 가평 글램핑)"
+            placeholder="장소 검색 (예: 가평 글램핑)"
           />
           <Button type="button" onClick={doSearch} disabled={searching} className="shrink-0">
             {searching ? '검색중…' : '검색'}

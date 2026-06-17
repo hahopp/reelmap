@@ -29,7 +29,7 @@ export default function AdminLoginPage() {
     <main className="mx-auto flex min-h-[70vh] w-full max-w-sm flex-col justify-center p-6">
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">🏕 ReelMap 어드민</CardTitle>
+          <CardTitle className="text-lg">📍 ReelMap 어드민</CardTitle>
         </CardHeader>
         <CardContent>
           <form action={login} className="flex flex-col gap-3">

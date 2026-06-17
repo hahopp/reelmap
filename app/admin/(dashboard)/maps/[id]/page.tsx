@@ -28,7 +28,7 @@ export default async function MapDetailPage({ params }: { params: Promise<{ id: 
           <Badge variant={map.visibility === 'unlisted' ? 'secondary' : 'outline'}>
             {map.visibility === 'unlisted' ? '링크공유' : '비공개'}
           </Badge>
-          {map.is_seed && <Badge>🏕 시드맵</Badge>}
+          {map.is_seed && <Badge>📍 시드맵</Badge>}
         </div>
         {isPublic ? (
           <a

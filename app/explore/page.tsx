@@ -3,7 +3,7 @@ import MapView from '@/components/map/MapView'
 import { listExplorePlaces, listAllTags } from '@/lib/places-explore'
 import TagFilter from './TagFilter'
 
-export const metadata = { title: '전체 캠핑장 지도 · ReelMap', robots: { index: false } }
+export const metadata = { title: '전체 지도 · ReelMap', robots: { index: false } }
 
 export default async function ExplorePage({
   searchParams,
@@ -19,7 +19,7 @@ export default async function ExplorePage({
     <div className="flex min-h-dvh flex-col">
       <header className="flex items-center gap-3 border-b bg-card/70 px-4 py-3 backdrop-blur">
         <Link href="/" className="text-sm font-semibold tracking-tight">
-          🏕 ReelMap
+          📍 ReelMap
         </Link>
         <span className="text-sm text-muted-foreground">전체 지도</span>
       </header>
@@ -40,7 +40,7 @@ export default async function ExplorePage({
 
         <section className="flex flex-col gap-4 p-5 lg:w-[440px] lg:overflow-y-auto lg:p-6">
           <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-bold tracking-tight">전체 캠핑장</h1>
+            <h1 className="text-2xl font-bold tracking-tight">전체 장소</h1>
             <p className="text-sm text-muted-foreground">
               {places.length}곳
               {selected.length > 0 && ` · ${selected.map((t) => '#' + t).join(' ')}`}

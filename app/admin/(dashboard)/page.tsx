@@ -75,7 +75,7 @@ export default async function AdminHomePage() {
                 <Badge variant={m.visibility === 'unlisted' ? 'secondary' : 'outline'}>
                   {m.visibility === 'unlisted' ? '링크공유' : '비공개'}
                 </Badge>
-                {m.is_seed && <Badge>🏕 시드맵</Badge>}
+                {m.is_seed && <Badge>📍 시드맵</Badge>}
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1">
