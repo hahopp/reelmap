@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { NormalizedPlace } from '@/lib/places/types'
-import { searchPlacesAction, addPlaceAction } from './actions'
+import { searchPlacesAction, addPlaceAction, addByKakaoUrlAction } from './actions'
 import { parseTags } from '@/lib/tags'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ export default function PlaceRegister({ mapId }: { mapId: string }) {
   const [tags, setTags] = useState('')
   const [manualName, setManualName] = useState('')
   const [picked, setPicked] = useState<{ lat: number; lng: number } | null>(null)
+  const [kakaoUrl, setKakaoUrl] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -101,6 +102,34 @@ export default function PlaceRegister({ mapId }: { mapId: string }) {
     })
   }
 
+  // 카카오맵 URL 붙여넣기 → 이름·좌표(transcoord)·id 자동 추가
+  function addByUrl() {
+    if (!instagramUrl.trim()) {
+      setMsg('인스타그램 링크를 먼저 입력하세요.')
+      return
+    }
+    if (!kakaoUrl.trim()) {
+      setMsg('카카오맵 URL을 붙여넣으세요.')
+      return
+    }
+    startTransition(async () => {
+      const res = await addByKakaoUrlAction({
+        mapId,
+        instagramUrl,
+        url: kakaoUrl,
+        tags: parseTags(tags),
+        note: note || undefined,
+      })
+      if (res.ok) {
+        setMsg(`✅ 추가됨: ${res.name}`)
+        setKakaoUrl('')
+        router.refresh()
+      } else {
+        setMsg('실패: ' + res.error)
+      }
+    })
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -115,6 +144,30 @@ export default function PlaceRegister({ mapId }: { mapId: string }) {
             onChange={(e) => setInstagramUrl(e.target.value)}
             placeholder="https://www.instagram.com/reel/XXXX/"
           />
+        </div>
+
+        {/* 카카오맵 URL로 자동 추가 (이름·좌표·id 자동) */}
+        <div className="flex flex-col gap-1.5 rounded-lg border border-primary/30 bg-primary/5 p-3">
+          <Label htmlFor="kakao-url">
+            카카오맵 URL로 추가{' '}
+            <span className="text-xs font-normal text-muted-foreground">
+              — 이름·좌표 자동 (가장 쉬움)
+            </span>
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              id="kakao-url"
+              value={kakaoUrl}
+              onChange={(e) => setKakaoUrl(e.target.value)}
+              placeholder="https://map.kakao.com/?...urlX=...&urlY=...&q=..."
+            />
+            <Button type="button" onClick={addByUrl} disabled={isPending} className="shrink-0">
+              추가
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            카카오맵에서 장소 클릭 후 브라우저 주소창 URL을 복사해 붙여넣으세요.
+          </p>
         </div>
 
         <div className="flex gap-2">

@@ -39,3 +39,22 @@ export async function kakaoSearchPlaces(query: string, size = 15): Promise<Norma
     url: d.place_url || null,
   }))
 }
+
+/** 카카오 WCONGNAMUL 좌표 → WGS84(lat/lng) 변환 (공식 transcoord API). */
+export async function kakaoWcongToWgs84(x: number, y: number): Promise<{ lat: number; lng: number }> {
+  const key = process.env.KAKAO_REST_API_KEY
+  if (!key) throw new Error('Missing env: KAKAO_REST_API_KEY')
+
+  const url = new URL('https://dapi.kakao.com/v2/local/geo/transcoord.json')
+  url.searchParams.set('x', String(x))
+  url.searchParams.set('y', String(y))
+  url.searchParams.set('input_coord', 'WCONGNAMUL')
+  url.searchParams.set('output_coord', 'WGS84')
+
+  const res = await fetch(url, { headers: { Authorization: `KakaoAK ${key}` } })
+  if (!res.ok) throw new Error(`좌표 변환 실패: ${res.status}`)
+  const data = (await res.json()) as { documents: { x: number; y: number }[] }
+  const d = data.documents[0]
+  if (!d) throw new Error('좌표 변환 결과가 없습니다')
+  return { lat: d.y, lng: d.x }
+}

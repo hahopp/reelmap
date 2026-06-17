@@ -3,7 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/admin/auth'
 import { searchPlaces } from '@/lib/places'
+import { kakaoWcongToWgs84 } from '@/lib/places/kakao'
 import type { NormalizedPlace } from '@/lib/places/types'
+import { parseKakaoMapUrl } from '@/lib/kakao-url'
 import { registerSeedPlaceToMap, removeMapPin, setPlaceTags } from '@/lib/pins'
 import { updateMap } from '@/lib/maps'
 import { parseTags } from '@/lib/tags'
@@ -27,6 +29,44 @@ export async function addPlaceAction(payload: {
     revalidatePath(`/admin/maps/${payload.mapId}`)
     revalidatePath('/explore')
     return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : '알 수 없는 오류' }
+  }
+}
+
+export async function addByKakaoUrlAction(payload: {
+  mapId: string
+  instagramUrl: string
+  url: string
+  tags?: string[]
+  note?: string
+}): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
+  await requireAdmin()
+  try {
+    const parsed = parseKakaoMapUrl(payload.url)
+    if (!parsed || parsed.wcongX == null || parsed.wcongY == null) {
+      return { ok: false, error: '좌표가 담긴 카카오맵 URL이 아니에요 (urlX/urlY 필요).' }
+    }
+    const { lat, lng } = await kakaoWcongToWgs84(parsed.wcongX, parsed.wcongY)
+    const name = parsed.name ?? '(이름 없음)'
+    await registerSeedPlaceToMap({
+      mapId: payload.mapId,
+      instagramUrl: payload.instagramUrl,
+      place: {
+        provider: 'kakao',
+        externalId: parsed.externalId,
+        name,
+        address: null,
+        roadAddress: null,
+        lat,
+        lng,
+      },
+      tags: payload.tags,
+      note: payload.note,
+    })
+    revalidatePath(`/admin/maps/${payload.mapId}`)
+    revalidatePath('/explore')
+    return { ok: true, name }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : '알 수 없는 오류' }
   }
