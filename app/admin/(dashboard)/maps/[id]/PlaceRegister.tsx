@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { NormalizedPlace } from '@/lib/places/types'
-import { searchPlacesAction, addPlaceAction, addByKakaoUrlAction } from './actions'
+import { searchPlacesAction, addPlaceAction, previewKakaoUrlAction } from './actions'
 import { parseTags } from '@/lib/tags'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -21,6 +21,12 @@ export default function PlaceRegister({ mapId }: { mapId: string }) {
   const [manualName, setManualName] = useState('')
   const [picked, setPicked] = useState<{ lat: number; lng: number } | null>(null)
   const [kakaoUrl, setKakaoUrl] = useState('')
+  const [preview, setPreview] = useState<{
+    lat: number
+    lng: number
+    externalId: string | null
+  } | null>(null)
+  const [previewName, setPreviewName] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -102,26 +108,54 @@ export default function PlaceRegister({ mapId }: { mapId: string }) {
     })
   }
 
-  // 카카오맵 URL 붙여넣기 → 이름·좌표(transcoord)·id 자동 추가
-  function addByUrl() {
-    if (!instagramUrl.trim()) {
-      setMsg('인스타그램 링크를 먼저 입력하세요.')
-      return
-    }
+  // 카카오맵 URL → 위치·이름 미리보기 (좌표 transcoord 변환)
+  function doPreview() {
     if (!kakaoUrl.trim()) {
       setMsg('카카오맵 URL을 붙여넣으세요.')
       return
     }
+    setMsg(null)
     startTransition(async () => {
-      const res = await addByKakaoUrlAction({
+      const res = await previewKakaoUrlAction(kakaoUrl)
+      if (res.ok) {
+        setPreview({ lat: res.lat, lng: res.lng, externalId: res.externalId })
+        setPreviewName(res.name)
+      } else {
+        setPreview(null)
+        setMsg('실패: ' + res.error)
+      }
+    })
+  }
+
+  // 미리보기 확정 → 추가
+  function addPreviewed() {
+    if (!instagramUrl.trim()) {
+      setMsg('인스타그램 링크를 먼저 입력하세요.')
+      return
+    }
+    if (!preview) return
+    const coord = preview
+    const name = previewName.trim() || '(이름 없음)'
+    startTransition(async () => {
+      const res = await addPlaceAction({
         mapId,
         instagramUrl,
-        url: kakaoUrl,
-        tags: parseTags(tags),
+        place: {
+          provider: 'kakao',
+          externalId: coord.externalId,
+          name,
+          address: null,
+          roadAddress: null,
+          lat: coord.lat,
+          lng: coord.lng,
+        },
         note: note || undefined,
+        tags: parseTags(tags),
       })
       if (res.ok) {
-        setMsg(`✅ 추가됨: ${res.name}`)
+        setMsg(`✅ 추가됨: ${name}`)
+        setPreview(null)
+        setPreviewName('')
         setKakaoUrl('')
         router.refresh()
       } else {
@@ -161,10 +195,43 @@ export default function PlaceRegister({ mapId }: { mapId: string }) {
               onChange={(e) => setKakaoUrl(e.target.value)}
               placeholder="https://map.kakao.com/?...urlX=...&urlY=...&q=..."
             />
-            <Button type="button" onClick={addByUrl} disabled={isPending} className="shrink-0">
-              추가
+            <Button type="button" onClick={doPreview} disabled={isPending} className="shrink-0">
+              미리보기
             </Button>
           </div>
+
+          {preview && (
+            <div className="flex flex-col gap-2 rounded-lg border bg-card p-2">
+              <Input
+                value={previewName}
+                onChange={(e) => setPreviewName(e.target.value)}
+                placeholder="장소 이름"
+              />
+              <MapView
+                key={`${preview.lat},${preview.lng}`}
+                className="h-48 rounded-lg border"
+                center={{ lat: preview.lat, lng: preview.lng }}
+                level={4}
+                markers={[{ id: 'preview', lat: preview.lat, lng: preview.lng, label: previewName }]}
+              />
+              <div className="flex gap-2">
+                <Button type="button" onClick={addPreviewed} disabled={isPending}>
+                  이 위치로 추가
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setPreview(null)
+                    setPreviewName('')
+                  }}
+                >
+                  취소
+                </Button>
+              </div>
+            </div>
+          )}
+
           <p className="text-xs text-muted-foreground">
             카카오맵에서 장소 클릭 후 브라우저 주소창 URL을 복사해 붙여넣으세요.
           </p>

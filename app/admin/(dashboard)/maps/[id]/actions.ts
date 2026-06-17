@@ -34,41 +34,23 @@ export async function addPlaceAction(payload: {
   }
 }
 
-export async function addByKakaoUrlAction(payload: {
-  mapId: string
-  instagramUrl: string
-  url: string
-  tags?: string[]
-  note?: string
-}): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
+/** 카카오맵 URL → 좌표(transcoord)·이름·id 해석 (미리보기용, 저장 안 함) */
+export async function previewKakaoUrlAction(
+  url: string,
+): Promise<
+  | { ok: true; name: string; lat: number; lng: number; externalId: string | null }
+  | { ok: false; error: string }
+> {
   await requireAdmin()
+  const parsed = parseKakaoMapUrl(url)
+  if (!parsed || parsed.wcongX == null || parsed.wcongY == null) {
+    return { ok: false, error: '좌표가 담긴 카카오맵 URL이 아니에요 (urlX/urlY 필요).' }
+  }
   try {
-    const parsed = parseKakaoMapUrl(payload.url)
-    if (!parsed || parsed.wcongX == null || parsed.wcongY == null) {
-      return { ok: false, error: '좌표가 담긴 카카오맵 URL이 아니에요 (urlX/urlY 필요).' }
-    }
     const { lat, lng } = await kakaoWcongToWgs84(parsed.wcongX, parsed.wcongY)
-    const name = parsed.name ?? '(이름 없음)'
-    await registerSeedPlaceToMap({
-      mapId: payload.mapId,
-      instagramUrl: payload.instagramUrl,
-      place: {
-        provider: 'kakao',
-        externalId: parsed.externalId,
-        name,
-        address: null,
-        roadAddress: null,
-        lat,
-        lng,
-      },
-      tags: payload.tags,
-      note: payload.note,
-    })
-    revalidatePath(`/admin/maps/${payload.mapId}`)
-    revalidatePath('/explore')
-    return { ok: true, name }
+    return { ok: true, name: parsed.name ?? '', lat, lng, externalId: parsed.externalId }
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : '알 수 없는 오류' }
+    return { ok: false, error: e instanceof Error ? e.message : '좌표 변환 실패' }
   }
 }
 
