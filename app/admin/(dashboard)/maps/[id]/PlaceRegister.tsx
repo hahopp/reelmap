@@ -9,6 +9,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import MapView from '@/components/map/MapView'
 
 export default function PlaceRegister({ mapId }: { mapId: string }) {
   const router = useRouter()
@@ -17,6 +18,8 @@ export default function PlaceRegister({ mapId }: { mapId: string }) {
   const [results, setResults] = useState<NormalizedPlace[]>([])
   const [note, setNote] = useState('')
   const [tags, setTags] = useState('')
+  const [manualName, setManualName] = useState('')
+  const [picked, setPicked] = useState<{ lat: number; lng: number } | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -52,6 +55,45 @@ export default function PlaceRegister({ mapId }: { mapId: string }) {
         setMsg(`✅ 추가됨: ${place.name}`)
         setResults([])
         setQuery('')
+        router.refresh()
+      } else {
+        setMsg('실패: ' + res.error)
+      }
+    })
+  }
+
+  // 검색에 없을 때: 지도에서 직접 위치를 찍어 추가 (external id 없음 → dedup 제외)
+  function addManual() {
+    if (!instagramUrl.trim()) {
+      setMsg('인스타그램 링크를 먼저 입력하세요.')
+      return
+    }
+    if (!manualName.trim() || !picked) {
+      setMsg('이름을 입력하고 지도에서 위치를 클릭하세요.')
+      return
+    }
+    const coord = picked
+    const name = manualName.trim()
+    startTransition(async () => {
+      const res = await addPlaceAction({
+        mapId,
+        instagramUrl,
+        place: {
+          provider: 'kakao',
+          externalId: null,
+          name,
+          address: null,
+          roadAddress: null,
+          lat: coord.lat,
+          lng: coord.lng,
+        },
+        note: note || undefined,
+        tags: parseTags(tags),
+      })
+      if (res.ok) {
+        setMsg(`✅ 추가됨: ${name}`)
+        setManualName('')
+        setPicked(null)
         router.refresh()
       } else {
         setMsg('실패: ' + res.error)
@@ -131,6 +173,35 @@ export default function PlaceRegister({ mapId }: { mapId: string }) {
             ))}
           </ul>
         )}
+
+        {/* 검색에 안 나올 때: 지도에서 직접 위치 지정 */}
+        <details className="rounded-lg border bg-muted/30 p-3">
+          <summary className="cursor-pointer text-sm font-medium">
+            검색에 안 나와요? 지도에서 직접 추가
+          </summary>
+          <div className="mt-3 flex flex-col gap-2">
+            <Input
+              value={manualName}
+              onChange={(e) => setManualName(e.target.value)}
+              placeholder="장소 이름 (예: ○○캠핑장)"
+            />
+            <p className="text-xs text-muted-foreground">지도를 움직여 해당 위치를 클릭하세요.</p>
+            <MapView className="h-56 rounded-lg border" onMapClick={(c) => setPicked(c)} />
+            {picked && (
+              <p className="text-xs text-muted-foreground">
+                선택 위치: {picked.lat.toFixed(5)}, {picked.lng.toFixed(5)}
+              </p>
+            )}
+            <Button
+              type="button"
+              onClick={addManual}
+              disabled={isPending || !manualName.trim() || !picked}
+              className="self-start"
+            >
+              이 위치로 추가
+            </Button>
+          </div>
+        </details>
       </CardContent>
     </Card>
   )
