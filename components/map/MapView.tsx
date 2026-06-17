@@ -17,6 +17,7 @@ export interface MapMarker {
   lat: number
   lng: number
   label?: string
+  index?: number
 }
 
 export interface MapViewProps {
@@ -56,12 +57,22 @@ export default function MapView({
       const bounds = new kakao.maps.LatLngBounds()
       markers.forEach((m) => {
         const pos = new kakao.maps.LatLng(m.lat, m.lng)
-        const marker = new kakao.maps.Marker({ map, position: pos })
-        if (m.label) {
-          const iw = new kakao.maps.InfoWindow({
-            content: `<div style="padding:4px 8px;font-size:12px;white-space:nowrap;">${m.label}</div>`,
+        if (m.index != null) {
+          // 번호 마커 (리스트와 매칭)
+          new kakao.maps.CustomOverlay({
+            map,
+            position: pos,
+            yAnchor: 0.5,
+            content: `<div style="display:flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 6px;border-radius:9999px;background:#3d7a5a;color:#fff;font-size:12px;font-weight:700;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);white-space:nowrap;">${m.index}</div>`,
           })
-          kakao.maps.event.addListener(marker, 'click', () => iw.open(map, marker))
+        } else {
+          const marker = new kakao.maps.Marker({ map, position: pos })
+          if (m.label) {
+            const iw = new kakao.maps.InfoWindow({
+              content: `<div style="padding:4px 8px;font-size:12px;white-space:nowrap;">${m.label}</div>`,
+            })
+            kakao.maps.event.addListener(marker, 'click', () => iw.open(map, marker))
+          }
         }
         bounds.extend(pos)
       })

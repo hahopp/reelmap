@@ -7,6 +7,7 @@ export interface PublicMap {
   title: string
   description: string | null
   isSeed: boolean
+  coverImageUrl: string | null
 }
 
 /** 공유 토큰으로 공개 지도 조회. RLS가 시드/링크공유만 통과(비공개는 null). */
@@ -14,7 +15,7 @@ export async function getPublicMap(shareToken: string): Promise<PublicMap | null
   const db = createAnonClient()
   const { data, error } = await db
     .from('map')
-    .select('id, title, description, is_seed')
+    .select('id, title, description, is_seed, cover_image_url')
     .eq('share_token', shareToken)
     .maybeSingle()
   if (error) throw new Error(error.message)
@@ -24,6 +25,7 @@ export async function getPublicMap(shareToken: string): Promise<PublicMap | null
     title: data.title as string,
     description: (data.description as string | null) ?? null,
     isSeed: data.is_seed as boolean,
+    coverImageUrl: (data.cover_image_url as string | null) ?? null,
   }
 }
 

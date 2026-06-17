@@ -29,7 +29,13 @@ export default async function PublicMapPage({
     selected.length > 0
       ? allPins.filter((p) => selected.every((t) => p.tags.includes(t)))
       : allPins
-  const markers = pins.map((p) => ({ id: p.pinId, lat: p.lat, lng: p.lng, label: p.name }))
+  const markers = pins.map((p, i) => ({
+    id: p.pinId,
+    lat: p.lat,
+    lng: p.lng,
+    label: p.name,
+    index: i + 1,
+  }))
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -61,6 +67,10 @@ export default async function PublicMapPage({
         </div>
 
         <section className="flex flex-col gap-4 p-5 lg:w-[440px] lg:overflow-y-auto lg:p-6">
+          {map.coverImageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={map.coverImageUrl} alt="" className="h-40 w-full rounded-xl object-cover" />
+          )}
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">{map.title}</h1>
@@ -85,11 +95,16 @@ export default async function PublicMapPage({
             </p>
           ) : (
             <ul className="flex flex-col gap-3">
-              {pins.map((p) => (
+              {pins.map((p, i) => (
                 <li key={p.pinId}>
                   <Card size="sm">
                     <CardHeader>
-                      <CardTitle>{p.name}</CardTitle>
+                      <CardTitle className="flex items-center gap-2">
+                        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                          {i + 1}
+                        </span>
+                        {p.name}
+                      </CardTitle>
                       <CardDescription>
                         {p.roadAddress || p.address || '주소 정보 없음'}
                       </CardDescription>
