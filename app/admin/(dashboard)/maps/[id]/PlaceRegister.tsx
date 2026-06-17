@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import type { NormalizedPlace } from '@/lib/places/types'
 import { searchPlacesAction, addPlaceAction } from './actions'
+import { parseTags } from '@/lib/tags'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -15,6 +16,7 @@ export default function PlaceRegister({ mapId }: { mapId: string }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<NormalizedPlace[]>([])
   const [note, setNote] = useState('')
+  const [tags, setTags] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
   const [searching, setSearching] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -39,7 +41,13 @@ export default function PlaceRegister({ mapId }: { mapId: string }) {
       return
     }
     startTransition(async () => {
-      const res = await addPlaceAction({ mapId, instagramUrl, place, note: note || undefined })
+      const res = await addPlaceAction({
+        mapId,
+        instagramUrl,
+        place,
+        note: note || undefined,
+        tags: parseTags(tags),
+      })
       if (res.ok) {
         setMsg(`✅ 추가됨: ${place.name}`)
         setResults([])
@@ -88,6 +96,12 @@ export default function PlaceRegister({ mapId }: { mapId: string }) {
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="메모 (선택)"
+        />
+
+        <Input
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+          placeholder="태그 (선택) — 예: #키즈 #수도권 #풀타프존"
         />
 
         {msg && <p className="text-sm text-muted-foreground">{msg}</p>}

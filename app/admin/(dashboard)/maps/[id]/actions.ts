@@ -4,8 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/admin/auth'
 import { searchPlaces } from '@/lib/places'
 import type { NormalizedPlace } from '@/lib/places/types'
-import { registerSeedPlaceToMap, removeMapPin } from '@/lib/pins'
+import { registerSeedPlaceToMap, removeMapPin, setPlaceTags } from '@/lib/pins'
 import { updateMap } from '@/lib/maps'
+import { parseTags } from '@/lib/tags'
 
 export async function searchPlacesAction(query: string): Promise<NormalizedPlace[]> {
   await requireAdmin()
@@ -18,11 +19,13 @@ export async function addPlaceAction(payload: {
   instagramUrl: string
   place: NormalizedPlace
   note?: string
+  tags?: string[]
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireAdmin()
   try {
     await registerSeedPlaceToMap(payload)
     revalidatePath(`/admin/maps/${payload.mapId}`)
+    revalidatePath('/explore')
     return { ok: true }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : '알 수 없는 오류' }
@@ -51,4 +54,14 @@ export async function updateMapAction(formData: FormData) {
   })
   revalidatePath(`/admin/maps/${id}`)
   revalidatePath('/')
+}
+
+export async function updatePlaceTagsAction(formData: FormData) {
+  await requireAdmin()
+  const placeId = String(formData.get('placeId') ?? '')
+  const mapId = String(formData.get('mapId') ?? '')
+  if (!placeId) return
+  await setPlaceTags(placeId, parseTags(String(formData.get('tags') ?? '')))
+  revalidatePath(`/admin/maps/${mapId}`)
+  revalidatePath('/explore')
 }

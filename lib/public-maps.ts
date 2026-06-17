@@ -78,7 +78,7 @@ export async function listPublicMapPins(mapId: string): Promise<PinRow[]> {
   const placeIds = pins.map((p) => p.place_id as string)
   const { data: places, error: pe } = await db
     .from('place')
-    .select('id, name, road_address, address, lat, lng')
+    .select('id, name, road_address, address, lat, lng, tags')
     .in('id', placeIds)
   if (pe) throw new Error(pe.message)
 
@@ -93,6 +93,7 @@ export async function listPublicMapPins(mapId: string): Promise<PinRow[]> {
       address: (pl?.address as string | null) ?? null,
       lat: (pl?.lat as number) ?? 0,
       lng: (pl?.lng as number) ?? 0,
+      tags: (pl?.tags as string[] | null) ?? [],
       contentId: (p.content_id as string | null) ?? null,
       note: (p.note as string | null) ?? null,
     }

@@ -11,6 +11,7 @@ export interface PinRow {
   address: string | null
   lat: number
   lng: number
+  tags: string[]
   contentId: string | null
   note: string | null
 }
@@ -29,7 +30,7 @@ export async function listMapPins(mapId: string): Promise<PinRow[]> {
   const placeIds = pins.map((p) => p.place_id as string)
   const { data: places, error: pe } = await db
     .from('place')
-    .select('id, name, road_address, address, lat, lng')
+    .select('id, name, road_address, address, lat, lng, tags')
     .in('id', placeIds)
   if (pe) throw new Error(pe.message)
 
@@ -44,6 +45,7 @@ export async function listMapPins(mapId: string): Promise<PinRow[]> {
       address: (pl?.address as string | null) ?? null,
       lat: (pl?.lat as number) ?? 0,
       lng: (pl?.lng as number) ?? 0,
+      tags: (pl?.tags as string[] | null) ?? [],
       contentId: (p.content_id as string | null) ?? null,
       note: (p.note as string | null) ?? null,
     }
@@ -60,6 +62,7 @@ export async function registerSeedPlaceToMap(input: {
   place: NormalizedPlace
   typeKey?: string
   note?: string
+  tags?: string[]
 }): Promise<void> {
   const norm = normalizeInstagramUrl(input.instagramUrl)
   if (!norm) throw new Error('유효한 인스타그램 링크가 아닙니다')
@@ -124,6 +127,12 @@ export async function registerSeedPlaceToMap(input: {
     placeId = created.id as string
   }
 
+  // 태그가 입력되면 place에 반영(등록 시 지정)
+  if (input.tags && input.tags.length > 0) {
+    const { error: te } = await db.from('place').update({ tags: input.tags }).eq('id', placeId)
+    if (te) throw new Error('tags: ' + te.message)
+  }
+
   // 3) submission 업서트 (콘텐츠 × 장소 후보, 시드 출처)
   const { error: se } = await db.from('submission').upsert(
     {
@@ -148,5 +157,12 @@ export async function registerSeedPlaceToMap(input: {
 export async function removeMapPin(pinId: string): Promise<void> {
   const db = createAdminClient()
   const { error } = await db.from('map_pin').delete().eq('id', pinId)
+  if (error) throw new Error(error.message)
+}
+
+/** 장소의 태그를 통째로 교체 */
+export async function setPlaceTags(placeId: string, tags: string[]): Promise<void> {
+  const db = createAdminClient()
+  const { error } = await db.from('place').update({ tags }).eq('id', placeId)
   if (error) throw new Error(error.message)
 }
