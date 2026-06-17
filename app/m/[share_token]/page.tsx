@@ -5,6 +5,7 @@ import { getPublicMap, listPublicMapPins } from '@/lib/public-maps'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import TagFilter from '@/app/explore/TagFilter'
+import { InstagramIcon } from '@/components/icons/instagram'
 
 // 공유 링크 페이지는 검색 비노출 (PRD 10장)
 export const metadata = { robots: { index: false } }
@@ -124,17 +125,23 @@ export default async function PublicMapPage({
                             ))}
                           </div>
                         )}
-                        {p.instaCodes.map((code, idx) => (
-                          <a
-                            key={code}
-                            href={`https://www.instagram.com/p/${code}/`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-primary underline-offset-4 hover:underline"
-                          >
-                            📷 인스타에서 보기{p.instaCodes.length > 1 ? ` ${idx + 1}` : ''} ↗
-                          </a>
-                        ))}
+                        {p.instaCodes.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {p.instaCodes.map((code) => (
+                              <a
+                                key={code}
+                                href={`https://www.instagram.com/p/${code}/`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                aria-label="인스타그램에서 보기"
+                                title="인스타그램에서 보기"
+                                className="inline-flex size-9 items-center justify-center rounded-full border bg-card text-muted-foreground transition hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                              >
+                                <InstagramIcon className="size-4" />
+                              </a>
+                            ))}
+                          </div>
+                        )}
                       </CardContent>
                     )}
                   </Card>
