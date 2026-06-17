@@ -13,6 +13,7 @@ import {
   setPinNote,
   listCandidatesForContent,
   addExistingPlaceToMap,
+  updatePinContent,
   type CandidatePlace,
 } from '@/lib/pins'
 import { normalizeInstagramUrl } from '@/lib/instagram'
@@ -158,5 +159,16 @@ export async function updatePinNoteAction(formData: FormData) {
   const mapId = String(formData.get('mapId') ?? '')
   if (!pinId) return
   await setPinNote(pinId, String(formData.get('note') ?? '').trim())
+  revalidatePath(`/admin/maps/${mapId}`)
+}
+
+export async function updatePinContentAction(formData: FormData) {
+  await requireAdmin()
+  const pinId = String(formData.get('pinId') ?? '')
+  const placeId = String(formData.get('placeId') ?? '')
+  const mapId = String(formData.get('mapId') ?? '')
+  const instagramUrl = String(formData.get('instagramUrl') ?? '')
+  if (!pinId || !placeId || !normalizeInstagramUrl(instagramUrl)) return
+  await updatePinContent({ pinId, placeId, instagramUrl })
   revalidatePath(`/admin/maps/${mapId}`)
 }

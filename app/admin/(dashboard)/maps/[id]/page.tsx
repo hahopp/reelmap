@@ -7,6 +7,7 @@ import {
   updateMapAction,
   updatePlaceTagsAction,
   updatePinNoteAction,
+  updatePinContentAction,
 } from './actions'
 import PlaceRegister from './PlaceRegister'
 import MapView from '@/components/map/MapView'
@@ -115,10 +116,17 @@ export default async function MapDetailPage({ params }: { params: Promise<{ id: 
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-col gap-1">
                 <span className="font-medium">{p.name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {p.roadAddress || p.address}
-                  {p.contentId && ` · 🔗 ${p.contentId}`}
-                </span>
+                <span className="text-xs text-muted-foreground">{p.roadAddress || p.address}</span>
+                {p.contentId && (
+                  <a
+                    href={`https://www.instagram.com/p/${p.contentId}/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-fit text-xs text-primary underline-offset-2 hover:underline"
+                  >
+                    🔗 인스타 {p.contentId} ↗
+                  </a>
+                )}
                 {p.note && <span className="text-xs text-muted-foreground">📝 {p.note}</span>}
                 {p.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1">
@@ -142,7 +150,9 @@ export default async function MapDetailPage({ params }: { params: Promise<{ id: 
               </form>
             </div>
             <details className="mt-2">
-              <summary className="cursor-pointer text-xs text-muted-foreground">태그·메모 수정</summary>
+              <summary className="cursor-pointer text-xs text-muted-foreground">
+                태그·메모·링크 수정
+              </summary>
               <form action={updatePlaceTagsAction} className="mt-2 flex gap-2">
                 <input type="hidden" name="placeId" value={p.placeId} />
                 <input type="hidden" name="mapId" value={map.id} />
@@ -157,6 +167,19 @@ export default async function MapDetailPage({ params }: { params: Promise<{ id: 
                 <Input name="note" defaultValue={p.note ?? ''} placeholder="메모" />
                 <Button type="submit" size="sm" variant="outline" className="shrink-0">
                   메모 저장
+                </Button>
+              </form>
+              <form action={updatePinContentAction} className="mt-2 flex gap-2">
+                <input type="hidden" name="pinId" value={p.pinId} />
+                <input type="hidden" name="placeId" value={p.placeId} />
+                <input type="hidden" name="mapId" value={map.id} />
+                <Input
+                  name="instagramUrl"
+                  defaultValue={p.contentId ? `https://www.instagram.com/p/${p.contentId}/` : ''}
+                  placeholder="https://www.instagram.com/p/..."
+                />
+                <Button type="submit" size="sm" variant="outline" className="shrink-0">
+                  링크 저장
                 </Button>
               </form>
             </details>

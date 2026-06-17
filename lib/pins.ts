@@ -260,3 +260,30 @@ export async function addExistingPlaceToMap(input: {
   )
   if (me) throw new Error('map_pin: ' + me.message)
 }
+
+/** 핀의 인스타 링크(콘텐츠) 교체 — 잘못 등록한 링크 수정용 */
+export async function updatePinContent(input: {
+  pinId: string
+  placeId: string
+  instagramUrl: string
+}): Promise<void> {
+  const norm = normalizeInstagramUrl(input.instagramUrl)
+  if (!norm) throw new Error('유효한 인스타그램 링크가 아닙니다')
+  const db = createAdminClient()
+
+  await db
+    .from('content')
+    .upsert({ id: norm.postId, source_url: norm.canonicalUrl, platform: 'instagram' }, { onConflict: 'id' })
+  await db.from('submission').upsert(
+    {
+      content_id: norm.postId,
+      place_id: input.placeId,
+      submitted_by: OPERATOR_USER_ID,
+      source: 'seed',
+      status: 'active',
+    },
+    { onConflict: 'content_id,place_id' },
+  )
+  const { error } = await db.from('map_pin').update({ content_id: norm.postId }).eq('id', input.pinId)
+  if (error) throw new Error(error.message)
+}
