@@ -13,7 +13,7 @@
 - 폰트 **Pretendard**, 분석 PostHog(미연동), 배포 Vercel(미배포)
 
 ## 인프라 상태
-- ✅ Supabase 프로젝트 생성 + 스키마 적용(`0001_init.sql`, `0002_map_cover.sql`)
+- ✅ Supabase 프로젝트 생성 + 스키마 적용(`0001_init.sql`, `0002_map_cover.sql`, `0003_place_tags.sql`)
 - ✅ 카카오 앱: JS키/REST키, 카카오맵 서비스 활성화, `http://localhost:3000` 플랫폼 등록
 - ✅ `.env.local`에 키 4종(Supabase URL/anon/secret, 카카오 JS/REST, ADMIN_PASSWORD)
 - ✅ git 저장소(`main`), 단계별 커밋 누적
@@ -22,7 +22,7 @@
 ---
 
 ## 데이터 모델 (Postgres, `supabase/migrations/`)
-`place_type` · `app_user` · `content`(인스타 post) · `place`(+`external_provider/external_place_id` dedup, WGS84) · `submission`(후보 정본, source=user/seed, status) · `selection`(투표=1계정1표) · `map`(+`share_token`, `is_seed`, `cover_image_url`) · `map_pin`(담기) · `report`
+`place_type` · `app_user` · `content`(인스타 post) · `place`(+`external_provider/external_place_id` dedup, WGS84, **`tags text[]`**) · `submission`(후보 정본, source=user/seed, status) · `selection`(투표=1계정1표) · `map`(+`share_token`, `is_seed`, `cover_image_url`) · `map_pin`(담기) · `report`
 - **RLS**: 사실/집계(place/submission/selection)는 공개 읽기, `map`/`map_pin`은 `is_seed` 또는 `unlisted`만 공개, 쓰기는 어드민(service_role)이 우회.
 
 ---
@@ -31,7 +31,8 @@
 
 ### 공개(비로그인)
 - **`/` 홈** — 큐레이션 시드맵 카드 그리드(반응형 1→2→3열). 커버(이미지 or 그라데이션+이모지) + **hover 확대**, 제목·설명(2줄)·핀수.
-- **`/m/[share_token]` 공개 지도** — 반응형(모바일 세로스택 / 데스크탑 좌우분할·지도 sticky), 카카오 지도+마커, 캠핑장 카드, 원본 인스타 링크, `noindex`.
+- **`/m/[share_token]` 공개 지도** — 반응형(모바일 세로스택 / 데스크탑 좌우분할·지도 sticky), 카카오 지도+마커, 캠핑장 카드, 원본 인스타 링크, 홈으로(←) 링크, `noindex`.
+- **`/explore` 전체 지도** — 모든 공개 캠핑장 + **태그 칩 필터**(`#키즈 #수도권 …`, AND 검색, URL `?tags=`로 공유 가능), 반응형.
 
 ### 어드민 (`/admin`, 비밀번호 게이트)
 - 로그인(HMAC 쿠키, 보호 레이아웃) / 로그아웃
@@ -53,7 +54,7 @@
 
 ## 검증
 - `npm test` — vitest, 인스타 정규화 16 케이스 ✅
-- 스모크 스크립트(`scripts/`): `check-db` · `smoke-map` · `smoke-kakao` · `smoke-register` · `smoke-public`(RLS) · `smoke-cover` · `list-maps` · `seed-demo`(데모 시드맵 3종)
+- 스모크 스크립트(`scripts/`): `check-db` · `smoke-map` · `smoke-kakao` · `smoke-register` · `smoke-public`(RLS) · `smoke-cover` · `list-maps` · `seed-demo`(데모 시드맵) · `demo-tag`(데모 태그)
 - `npm run build` / `tsc --noEmit` green
 
 ## 명령어
@@ -67,6 +68,7 @@
 ## 다음 후보 (백로그)
 - **소비자 핵심 루프** ⭐ — 링크 붙여넣기 → 후보 캠핑장 즉시 표시(가설 B 검증), Phase 2 본류
 - **소셜 로그인**(카카오/구글) + 1계정 1표 실제 적용 (Phase 3)
+- **어드민 태그 입력/수정**(장소 등록·수정 시 `#태그`) · **필터를 기획전으로 저장**(스마트 지도)
 - 공개 지도 페이지 커버 배너 / 장소→콘텐츠 목록 뷰(어드민)
 - 신뢰도 라벨 UI · 신고 처리 · PostHog 계측 · Vercel 배포 · SEO/OG
 - 커버 이미지 업로드(현재 URL만) · 네이버 지도 전환(옵션)
