@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import Script from 'next/script'
 import { cn } from '@/lib/utils'
 
@@ -25,6 +25,9 @@ export interface MapViewProps {
   center?: { lat: number; lng: number }
   level?: number
   onMapClick?: (coord: { lat: number; lng: number }) => void
+  onMarkerClick?: (id: string) => void
+  focus?: { lat: number; lng: number } | null
+  focusLevel?: number
   className?: string
 }
 
@@ -39,10 +42,23 @@ export default function MapView({
   center,
   level = 9,
   onMapClick,
+  onMarkerClick,
+  focus,
+  focusLevel = 5,
   className,
 }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement | null>(null)
+  const mapInstanceRef = useRef<any>(null)
   const jsKey = process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY
+
+  // 선택된 위치로 부드럽게 이동 + 확대
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    const kakao = window.kakao
+    if (!map || !kakao?.maps || !focus) return
+    map.setLevel(focusLevel)
+    map.panTo(new kakao.maps.LatLng(focus.lat, focus.lng))
+  }, [focus?.lat, focus?.lng, focusLevel])
 
   function initMap() {
     const kakao = window.kakao
@@ -53,21 +69,19 @@ export default function MapView({
         center: new kakao.maps.LatLng(c.lat, c.lng),
         level,
       })
+      mapInstanceRef.current = map
 
       const bounds = new kakao.maps.LatLngBounds()
       markers.forEach((m) => {
         const pos = new kakao.maps.LatLng(m.lat, m.lng)
         if (m.index != null) {
-          // 번호 핀 마커 (리스트와 매칭) — 핀 모양 + 굵은 숫자로 눈에 띄게
-          new kakao.maps.CustomOverlay({
-            map,
-            position: pos,
-            yAnchor: 1,
-            content: `<div style="display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));">
-              <div style="display:flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 7px;border-radius:9999px;background:#2f7d4f;border:2.5px solid #fff;color:#fff;font-size:15px;font-weight:800;line-height:1;">${m.index}</div>
-              <div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid #2f7d4f;margin-top:-3px;"></div>
-            </div>`,
-          })
+          // 번호 핀 마커 (리스트와 매칭) — 클릭 가능
+          const el = document.createElement('div')
+          el.style.cssText =
+            'display:flex;flex-direction:column;align-items:center;cursor:pointer;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));'
+          el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 7px;border-radius:9999px;background:#2f7d4f;border:2.5px solid #fff;color:#fff;font-size:15px;font-weight:800;line-height:1;">${m.index}</div><div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid #2f7d4f;margin-top:-3px;"></div>`
+          if (onMarkerClick) el.addEventListener('click', () => onMarkerClick(m.id))
+          new kakao.maps.CustomOverlay({ map, position: pos, yAnchor: 1, content: el })
         } else {
           const marker = new kakao.maps.Marker({ map, position: pos })
           if (m.label) {
