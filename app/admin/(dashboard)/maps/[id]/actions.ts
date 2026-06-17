@@ -3,10 +3,19 @@
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/admin/auth'
 import { searchPlaces } from '@/lib/places'
-import { kakaoWcongToWgs84 } from '@/lib/places/kakao'
+import { kakaoWcongToWgs84, kakaoCoord2Address } from '@/lib/places/kakao'
 import type { NormalizedPlace } from '@/lib/places/types'
 import { parseKakaoMapUrl } from '@/lib/kakao-url'
-import { registerSeedPlaceToMap, removeMapPin, setPlaceTags, setPinNote } from '@/lib/pins'
+import {
+  registerSeedPlaceToMap,
+  removeMapPin,
+  setPlaceTags,
+  setPinNote,
+  listCandidatesForContent,
+  addExistingPlaceToMap,
+  type CandidatePlace,
+} from '@/lib/pins'
+import { normalizeInstagramUrl } from '@/lib/instagram'
 import { updateMap } from '@/lib/maps'
 import { parseTags } from '@/lib/tags'
 
@@ -38,7 +47,15 @@ export async function addPlaceAction(payload: {
 export async function previewKakaoUrlAction(
   url: string,
 ): Promise<
-  | { ok: true; name: string; lat: number; lng: number; externalId: string | null }
+  | {
+      ok: true
+      name: string
+      lat: number
+      lng: number
+      externalId: string | null
+      address: string | null
+      roadAddress: string | null
+    }
   | { ok: false; error: string }
 > {
   await requireAdmin()
@@ -48,9 +65,56 @@ export async function previewKakaoUrlAction(
   }
   try {
     const { lat, lng } = await kakaoWcongToWgs84(parsed.wcongX, parsed.wcongY)
-    return { ok: true, name: parsed.name ?? '', lat, lng, externalId: parsed.externalId }
+    let address: string | null = null
+    let roadAddress: string | null = null
+    try {
+      const a = await kakaoCoord2Address(lng, lat)
+      address = a.address
+      roadAddress = a.roadAddress
+    } catch {
+      // 주소 조회 실패는 무시 (좌표는 유효)
+    }
+    return {
+      ok: true,
+      name: parsed.name ?? '',
+      lat,
+      lng,
+      externalId: parsed.externalId,
+      address,
+      roadAddress,
+    }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : '좌표 변환 실패' }
+  }
+}
+
+/** 인스타 링크 → 이미 등록된 후보 장소 조회 */
+export async function lookupCandidatesAction(
+  instagramUrl: string,
+): Promise<{ ok: true; candidates: CandidatePlace[] } | { ok: false }> {
+  await requireAdmin()
+  const norm = normalizeInstagramUrl(instagramUrl)
+  if (!norm) return { ok: false }
+  const candidates = await listCandidatesForContent(norm.postId)
+  return { ok: true, candidates }
+}
+
+/** 기존 장소를 현재 지도에 담기 */
+export async function addExistingPlaceAction(payload: {
+  mapId: string
+  instagramUrl: string
+  placeId: string
+  note?: string
+  tags?: string[]
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAdmin()
+  try {
+    await addExistingPlaceToMap(payload)
+    revalidatePath(`/admin/maps/${payload.mapId}`)
+    revalidatePath('/explore')
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : '알 수 없는 오류' }
   }
 }
 

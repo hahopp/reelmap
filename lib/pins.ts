@@ -87,7 +87,7 @@ export async function registerSeedPlaceToMap(input: {
   // 1) content 업서트
   const { error: ce } = await db
     .from('content')
-    .upsert({ id: norm.postId, source_url: input.instagramUrl, platform: 'instagram' }, { onConflict: 'id' })
+    .upsert({ id: norm.postId, source_url: norm.canonicalUrl, platform: 'instagram' }, { onConflict: 'id' })
   if (ce) throw new Error('content: ' + ce.message)
 
   // 2) place 업서트 (external id 있으면 dedup, 없으면 신규)
@@ -186,4 +186,77 @@ export async function setPinNote(pinId: string, note: string): Promise<void> {
   const db = createAdminClient()
   const { error } = await db.from('map_pin').update({ note: note || null }).eq('id', pinId)
   if (error) throw new Error(error.message)
+}
+
+export interface CandidatePlace {
+  placeId: string
+  name: string
+  roadAddress: string | null
+  address: string | null
+}
+
+/** 이 콘텐츠(post)에 이미 등록된 후보 장소 목록 */
+export async function listCandidatesForContent(postId: string): Promise<CandidatePlace[]> {
+  const db = createAdminClient()
+  const { data: subs, error } = await db
+    .from('submission')
+    .select('place_id')
+    .eq('content_id', postId)
+    .neq('status', 'hidden')
+  if (error) throw new Error(error.message)
+  if (!subs || subs.length === 0) return []
+
+  const placeIds = subs.map((s) => s.place_id as string)
+  const { data: places, error: pe } = await db
+    .from('place')
+    .select('id, name, road_address, address')
+    .in('id', placeIds)
+  if (pe) throw new Error(pe.message)
+
+  return (places ?? []).map((p) => ({
+    placeId: p.id as string,
+    name: p.name as string,
+    roadAddress: (p.road_address as string | null) ?? null,
+    address: (p.address as string | null) ?? null,
+  }))
+}
+
+/** 이미 존재하는 장소를 현재 지도에 담기 (content/submission/map_pin) */
+export async function addExistingPlaceToMap(input: {
+  mapId: string
+  instagramUrl: string
+  placeId: string
+  note?: string
+  tags?: string[]
+}): Promise<void> {
+  const norm = normalizeInstagramUrl(input.instagramUrl)
+  if (!norm) throw new Error('유효한 인스타그램 링크가 아닙니다')
+  const db = createAdminClient()
+
+  const { error: ce } = await db
+    .from('content')
+    .upsert({ id: norm.postId, source_url: norm.canonicalUrl, platform: 'instagram' }, { onConflict: 'id' })
+  if (ce) throw new Error('content: ' + ce.message)
+
+  if (input.tags && input.tags.length > 0) {
+    await db.from('place').update({ tags: input.tags }).eq('id', input.placeId)
+  }
+
+  const { error: se } = await db.from('submission').upsert(
+    {
+      content_id: norm.postId,
+      place_id: input.placeId,
+      submitted_by: OPERATOR_USER_ID,
+      source: 'seed',
+      status: 'active',
+    },
+    { onConflict: 'content_id,place_id' },
+  )
+  if (se) throw new Error('submission: ' + se.message)
+
+  const { error: me } = await db.from('map_pin').upsert(
+    { map_id: input.mapId, place_id: input.placeId, content_id: norm.postId, note: input.note ?? null },
+    { onConflict: 'map_id,place_id' },
+  )
+  if (me) throw new Error('map_pin: ' + me.message)
 }
