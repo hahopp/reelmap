@@ -3,7 +3,13 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
-export default function TagFilter({ allTags }: { allTags: string[] }) {
+export default function TagFilter({
+  allTags,
+  basePath = '/explore',
+}: {
+  allTags: string[]
+  basePath?: string
+}) {
   const router = useRouter()
   const sp = useSearchParams()
   const selected = new Set((sp.get('tags') ?? '').split(',').filter(Boolean))
@@ -13,7 +19,7 @@ export default function TagFilter({ allTags }: { allTags: string[] }) {
     if (next.has(tag)) next.delete(tag)
     else next.add(tag)
     const q = Array.from(next).map(encodeURIComponent).join(',')
-    router.push(q ? `/explore?tags=${q}` : '/explore')
+    router.push(q ? `${basePath}?tags=${q}` : basePath)
   }
 
   if (allTags.length === 0) {
@@ -44,7 +50,7 @@ export default function TagFilter({ allTags }: { allTags: string[] }) {
       {selected.size > 0 && (
         <button
           type="button"
-          onClick={() => router.push('/explore')}
+          onClick={() => router.push(basePath)}
           className="px-1 text-sm text-muted-foreground underline"
         >
           초기화

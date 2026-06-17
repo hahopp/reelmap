@@ -4,19 +4,31 @@ import MapView from '@/components/map/MapView'
 import { getPublicMap, listPublicMapPins } from '@/lib/public-maps'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import TagFilter from '@/app/explore/TagFilter'
 
 // 공유 링크 페이지는 검색 비노출 (PRD 10장)
 export const metadata = { robots: { index: false } }
 
 export default async function PublicMapPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ share_token: string }>
+  searchParams: Promise<{ tags?: string }>
 }) {
   const { share_token } = await params
+  const sp = await searchParams
+  const selected = sp.tags ? sp.tags.split(',').filter(Boolean) : []
+
   const map = await getPublicMap(share_token)
   if (!map) notFound()
-  const pins = await listPublicMapPins(map.id)
+  const allPins = await listPublicMapPins(map.id)
+
+  const allTags = Array.from(new Set(allPins.flatMap((p) => p.tags))).sort()
+  const pins =
+    selected.length > 0
+      ? allPins.filter((p) => selected.every((t) => p.tags.includes(t)))
+      : allPins
   const markers = pins.map((p) => ({ id: p.pinId, lat: p.lat, lng: p.lng, label: p.name }))
 
   return (
@@ -27,7 +39,9 @@ export default async function PublicMapPage({
           aria-label="홈으로 돌아가기"
           className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
-          <span aria-hidden className="text-base leading-none">←</span>
+          <span aria-hidden className="text-base leading-none">
+            ←
+          </span>
           <span className="font-semibold tracking-tight text-foreground">📍 ReelMap</span>
         </Link>
       </header>
@@ -36,7 +50,7 @@ export default async function PublicMapPage({
       <div className="flex flex-1 flex-col lg:flex-row-reverse">
         <div className="lg:flex-1">
           <div className="h-[45vh] w-full lg:sticky lg:top-0 lg:h-dvh">
-            {pins.length > 0 ? (
+            {markers.length > 0 ? (
               <MapView className="h-full w-full" markers={markers} />
             ) : (
               <div className="flex h-full items-center justify-center bg-muted text-sm text-muted-foreground">
@@ -53,12 +67,21 @@ export default async function PublicMapPage({
               {map.isSeed && <Badge variant="secondary">📍 큐레이션</Badge>}
             </div>
             {map.description && <p className="text-muted-foreground">{map.description}</p>}
-            <p className="text-sm text-muted-foreground">장소 {pins.length}곳</p>
+            <p className="text-sm text-muted-foreground">
+              장소 {pins.length}곳
+              {selected.length > 0 && ` · ${selected.map((t) => '#' + t).join(' ')}`}
+            </p>
           </div>
 
-          {pins.length === 0 ? (
+          {allTags.length > 0 && <TagFilter allTags={allTags} basePath={`/m/${share_token}`} />}
+
+          {allPins.length === 0 ? (
             <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
               아직 등록된 장소가 없어요.
+            </p>
+          ) : pins.length === 0 ? (
+            <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              선택한 태그에 맞는 장소가 없어요.
             </p>
           ) : (
             <ul className="flex flex-col gap-3">
@@ -67,18 +90,35 @@ export default async function PublicMapPage({
                   <Card size="sm">
                     <CardHeader>
                       <CardTitle>{p.name}</CardTitle>
-                      <CardDescription>{p.roadAddress || p.address || '주소 정보 없음'}</CardDescription>
+                      <CardDescription>
+                        {p.roadAddress || p.address || '주소 정보 없음'}
+                      </CardDescription>
                     </CardHeader>
-                    {p.contentId && (
-                      <CardContent>
-                        <a
-                          href={`https://www.instagram.com/p/${p.contentId}/`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-primary underline-offset-4 hover:underline"
-                        >
-                          📷 인스타에서 보기 ↗
-                        </a>
+                    {(p.note || p.tags.length > 0 || p.contentId) && (
+                      <CardContent className="flex flex-col gap-2">
+                        {p.note && <p className="text-sm text-foreground/80">📝 {p.note}</p>}
+                        {p.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {p.tags.map((t) => (
+                              <span
+                                key={t}
+                                className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                              >
+                                #{t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {p.contentId && (
+                          <a
+                            href={`https://www.instagram.com/p/${p.contentId}/`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary underline-offset-4 hover:underline"
+                          >
+                            📷 인스타에서 보기 ↗
+                          </a>
+                        )}
                       </CardContent>
                     )}
                   </Card>
