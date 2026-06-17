@@ -55,26 +55,24 @@ export default function PublicMapView({
   }
 
   return (
-    <div className="flex flex-1 flex-col lg:flex-row-reverse">
-      <div className="lg:flex-1">
-        <div className="h-[45vh] w-full lg:sticky lg:top-0 lg:h-dvh">
-          {markers.length > 0 ? (
-            <MapView
-              className="h-full w-full"
-              markers={markers}
-              focus={focus}
-              focusLevel={5}
-              onMarkerClick={handleMarkerClick}
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center bg-muted text-sm text-muted-foreground">
-              표시할 장소가 없어요
-            </div>
-          )}
-        </div>
+    <div className="flex min-h-0 flex-1 flex-col lg:flex-row-reverse">
+      <div className="h-[45vh] w-full shrink-0 lg:h-full lg:flex-1">
+        {markers.length > 0 ? (
+          <MapView
+            className="h-full w-full"
+            markers={markers}
+            focus={focus}
+            focusLevel={5}
+            onMarkerClick={handleMarkerClick}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center bg-muted text-sm text-muted-foreground">
+            표시할 장소가 없어요
+          </div>
+        )}
       </div>
 
-      <section className="flex flex-col gap-4 p-5 lg:w-[440px] lg:overflow-y-auto lg:p-6">
+      <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5 lg:flex-none lg:w-[440px] lg:p-6">
         {map.coverImageUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={map.coverImageUrl} alt="" className="h-40 w-full rounded-xl object-cover" />

@@ -28,8 +28,8 @@ export default async function PublicMapPage({
       : allPins
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="flex items-center border-b bg-card/70 px-4 py-3 backdrop-blur">
+    <div className="flex h-dvh flex-col overflow-hidden">
+      <header className="flex shrink-0 items-center border-b bg-card/70 px-4 py-3 backdrop-blur">
         <Link
           href="/"
           aria-label="홈으로 돌아가기"
