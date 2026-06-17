@@ -85,6 +85,20 @@ export async function listPublicMapPins(mapId: string): Promise<PinRow[]> {
   if (pe) throw new Error(pe.message)
 
   const byId = new Map((places ?? []).map((p) => [p.id as string, p]))
+
+  const codesByPlace = new Map<string, string[]>()
+  const { data: subs } = await db
+    .from('submission')
+    .select('place_id, content_id')
+    .in('place_id', placeIds)
+    .neq('status', 'hidden')
+  for (const s of subs ?? []) {
+    const k = s.place_id as string
+    const arr = codesByPlace.get(k) ?? []
+    arr.push(s.content_id as string)
+    codesByPlace.set(k, arr)
+  }
+
   return pins.map((p) => {
     const pl = byId.get(p.place_id as string)
     return {
@@ -96,6 +110,7 @@ export async function listPublicMapPins(mapId: string): Promise<PinRow[]> {
       lat: (pl?.lat as number) ?? 0,
       lng: (pl?.lng as number) ?? 0,
       tags: (pl?.tags as string[] | null) ?? [],
+      instaCodes: codesByPlace.get(p.place_id as string) ?? [],
       contentId: (p.content_id as string | null) ?? null,
       note: (p.note as string | null) ?? null,
     }

@@ -14,6 +14,8 @@ import {
   listCandidatesForContent,
   addExistingPlaceToMap,
   updatePinContent,
+  addPlaceInstaLink,
+  removePlaceInstaLink,
   type CandidatePlace,
 } from '@/lib/pins'
 import { normalizeInstagramUrl } from '@/lib/instagram'
@@ -170,5 +172,26 @@ export async function updatePinContentAction(formData: FormData) {
   const instagramUrl = String(formData.get('instagramUrl') ?? '')
   if (!pinId || !placeId || !normalizeInstagramUrl(instagramUrl)) return
   await updatePinContent({ pinId, placeId, instagramUrl })
+  revalidatePath(`/admin/maps/${mapId}`)
+}
+
+export async function addPlaceInstaLinkAction(formData: FormData) {
+  await requireAdmin()
+  const placeId = String(formData.get('placeId') ?? '')
+  const mapId = String(formData.get('mapId') ?? '')
+  const instagramUrl = String(formData.get('instagramUrl') ?? '')
+  if (!placeId || !normalizeInstagramUrl(instagramUrl)) return
+  await addPlaceInstaLink(placeId, instagramUrl)
+  revalidatePath(`/admin/maps/${mapId}`)
+  revalidatePath('/explore')
+}
+
+export async function removePlaceInstaLinkAction(formData: FormData) {
+  await requireAdmin()
+  const placeId = String(formData.get('placeId') ?? '')
+  const postId = String(formData.get('postId') ?? '')
+  const mapId = String(formData.get('mapId') ?? '')
+  if (!placeId || !postId) return
+  await removePlaceInstaLink(placeId, postId)
   revalidatePath(`/admin/maps/${mapId}`)
 }

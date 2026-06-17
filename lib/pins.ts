@@ -13,6 +13,7 @@ export interface PinRow {
   lat: number
   lng: number
   tags: string[]
+  instaCodes: string[]
   contentId: string | null
   note: string | null
 }
@@ -36,6 +37,8 @@ export async function listMapPins(mapId: string): Promise<PinRow[]> {
   if (pe) throw new Error(pe.message)
 
   const byId = new Map((places ?? []).map((p) => [p.id as string, p]))
+  const codesByPlace = await instaCodesByPlace(db, placeIds)
+
   return pins.map((p) => {
     const pl = byId.get(p.place_id as string)
     return {
@@ -47,10 +50,32 @@ export async function listMapPins(mapId: string): Promise<PinRow[]> {
       lat: (pl?.lat as number) ?? 0,
       lng: (pl?.lng as number) ?? 0,
       tags: (pl?.tags as string[] | null) ?? [],
+      instaCodes: codesByPlace.get(p.place_id as string) ?? [],
       contentId: (p.content_id as string | null) ?? null,
       note: (p.note as string | null) ?? null,
     }
   })
+}
+
+/** 여러 장소의 인스타 링크(submission content_ids) 조회 → place_id별 묶음 */
+async function instaCodesByPlace(
+  db: ReturnType<typeof createAdminClient>,
+  placeIds: string[],
+): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>()
+  if (placeIds.length === 0) return map
+  const { data } = await db
+    .from('submission')
+    .select('place_id, content_id')
+    .in('place_id', placeIds)
+    .neq('status', 'hidden')
+  for (const s of data ?? []) {
+    const k = s.place_id as string
+    const arr = map.get(k) ?? []
+    arr.push(s.content_id as string)
+    map.set(k, arr)
+  }
+  return map
 }
 
 /**
@@ -178,6 +203,34 @@ export async function removeMapPin(pinId: string): Promise<void> {
 export async function setPlaceTags(placeId: string, tags: string[]): Promise<void> {
   const db = createAdminClient()
   const { error } = await db.from('place').update({ tags }).eq('id', placeId)
+  if (error) throw new Error(error.message)
+}
+
+/** 장소에 인스타 링크 추가 (1장소:N인스타 = submission 1행 추가) */
+export async function addPlaceInstaLink(placeId: string, instagramUrl: string): Promise<void> {
+  const norm = normalizeInstagramUrl(instagramUrl)
+  if (!norm) throw new Error('유효한 인스타그램 링크가 아닙니다')
+  const db = createAdminClient()
+  await db
+    .from('content')
+    .upsert({ id: norm.postId, source_url: norm.canonicalUrl, platform: 'instagram' }, { onConflict: 'id' })
+  const { error } = await db.from('submission').upsert(
+    {
+      content_id: norm.postId,
+      place_id: placeId,
+      submitted_by: OPERATOR_USER_ID,
+      source: 'seed',
+      status: 'active',
+    },
+    { onConflict: 'content_id,place_id' },
+  )
+  if (error) throw new Error(error.message)
+}
+
+/** 장소의 특정 인스타 링크 제거 (submission 삭제) */
+export async function removePlaceInstaLink(placeId: string, postId: string): Promise<void> {
+  const db = createAdminClient()
+  const { error } = await db.from('submission').delete().eq('place_id', placeId).eq('content_id', postId)
   if (error) throw new Error(error.message)
 }
 

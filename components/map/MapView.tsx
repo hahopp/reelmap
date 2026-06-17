@@ -58,12 +58,15 @@ export default function MapView({
       markers.forEach((m) => {
         const pos = new kakao.maps.LatLng(m.lat, m.lng)
         if (m.index != null) {
-          // 번호 마커 (리스트와 매칭)
+          // 번호 핀 마커 (리스트와 매칭) — 핀 모양 + 굵은 숫자로 눈에 띄게
           new kakao.maps.CustomOverlay({
             map,
             position: pos,
-            yAnchor: 0.5,
-            content: `<div style="display:flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 6px;border-radius:9999px;background:#3d7a5a;color:#fff;font-size:12px;font-weight:700;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);white-space:nowrap;">${m.index}</div>`,
+            yAnchor: 1,
+            content: `<div style="display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));">
+              <div style="display:flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 7px;border-radius:9999px;background:#2f7d4f;border:2.5px solid #fff;color:#fff;font-size:15px;font-weight:800;line-height:1;">${m.index}</div>
+              <div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid #2f7d4f;margin-top:-3px;"></div>
+            </div>`,
           })
         } else {
           const marker = new kakao.maps.Marker({ map, position: pos })

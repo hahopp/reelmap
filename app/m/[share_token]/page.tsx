@@ -109,7 +109,7 @@ export default async function PublicMapPage({
                         {p.roadAddress || p.address || '주소 정보 없음'}
                       </CardDescription>
                     </CardHeader>
-                    {(p.note || p.tags.length > 0 || p.contentId) && (
+                    {(p.note || p.tags.length > 0 || p.instaCodes.length > 0) && (
                       <CardContent className="flex flex-col gap-2">
                         {p.note && <p className="text-sm text-foreground/80">📝 {p.note}</p>}
                         {p.tags.length > 0 && (
@@ -124,16 +124,17 @@ export default async function PublicMapPage({
                             ))}
                           </div>
                         )}
-                        {p.contentId && (
+                        {p.instaCodes.map((code, idx) => (
                           <a
-                            href={`https://www.instagram.com/p/${p.contentId}/`}
+                            key={code}
+                            href={`https://www.instagram.com/p/${code}/`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-sm text-primary underline-offset-4 hover:underline"
                           >
-                            📷 인스타에서 보기 ↗
+                            📷 인스타에서 보기{p.instaCodes.length > 1 ? ` ${idx + 1}` : ''} ↗
                           </a>
-                        )}
+                        ))}
                       </CardContent>
                     )}
                   </Card>
