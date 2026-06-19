@@ -6,6 +6,7 @@ import { normalizeInstagramUrl } from '@/lib/instagram'
 import { lookupCandidatesByPostId } from '@/lib/public-lookup'
 import { trustLabel, type TrustKind } from '@/lib/trust'
 import LinkInput from '@/components/LinkInput'
+import SaveCandidateButton from '@/components/SaveCandidateButton'
 
 export const metadata = { title: '장소 찾기 · ReelMap', robots: { index: false } }
 
@@ -119,8 +120,8 @@ export default async function FindPage({
                           {c.roadAddress || c.address || '주소 정보 없음'}
                         </CardDescription>
                       </CardHeader>
-                      {c.tags.length > 0 && (
-                        <CardContent>
+                      <CardContent className="flex flex-col gap-3">
+                        {c.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1">
                             {c.tags.map((tag) => (
                               <span
@@ -131,8 +132,13 @@ export default async function FindPage({
                               </span>
                             ))}
                           </div>
-                        </CardContent>
-                      )}
+                        )}
+                        <SaveCandidateButton
+                          submissionId={c.submissionId}
+                          placeId={c.placeId}
+                          contentId={norm.postId}
+                        />
+                      </CardContent>
                     </Card>
                   </li>
                 )
