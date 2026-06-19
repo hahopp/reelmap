@@ -9,7 +9,7 @@
 ## ▶ 내일 이어서 (추천 시작점)
 - **M2 증분 3 — 새 장소 추가**: 후보 없는 릴에서 검색/지도클릭으로 장소 직접 추가(어드민 PlaceRegister 로직 소비자용 경량화). 익명 신원 재사용.
 - **M2 증분 4 — 내 지도 뷰/관리**: 담은 핀 모아보기(PublicMapView 재사용) + 핀 제거.
-- **카카오 도메인 등록 대기(운영자, 코드 불가)**: Kakao Developers에 `https://reelmap-teal.vercel.app` 추가해야 `/find`·`/explore`·`/m` 지도가 뜸(현재 localhost만).
+- ✅ **카카오 도메인 등록 완료**(`https://reelmap-teal.vercel.app`) — `/find`·`/explore`·`/m` 지도 타일 렌더됨.
 - 그 외 백로그는 맨 아래 참고.
 
 ---
@@ -24,7 +24,7 @@
 - ✅ 카카오 앱: JS/REST 키, 카카오맵 활성화, `http://localhost:3000` 등록
 - ✅ `.env.local` 키 세팅, git `main` 커밋 누적
 - ✅ **Vercel 프로덕션 배포**(`hahao/reelmap`, `https://reelmap-teal.vercel.app`) — env 6개 Vercel 등록(prod+preview)
-- ✅ **Supabase 익명 로그인 활성화**(M2 담기 동작) · ⏳ PostHog 전 · **카카오 도메인 등록 대기**(지도 렌더)
+- ✅ **Supabase 익명 로그인 활성화**(M2 담기) · ✅ **카카오 vercel 도메인 등록**(지도 렌더) · ⏳ PostHog 전
 
 ---
 
