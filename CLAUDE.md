@@ -3,7 +3,8 @@
 # ReelMap — 프로젝트 가이드
 
 인스타에서 본 그 장소를 주제별 지도로 모아 공유하는 서비스. 포지셔닝=장소 일반(주제별), 첫 버티컬·시딩=캠핑.
-상세 기획: `PRD.md` · 단계/작업 트랙: `DEVELOPMENT_PLAN.md`.
+
+**문서**: 전체 지도 = [`docs/README.md`](docs/README.md). 작업 시작 전 [`docs/STATUS.md`](docs/STATUS.md)(현재 상태·할 일) → 코드 수정 전 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)(구조). 기획 = [`docs/PRD.md`](docs/PRD.md) · 단계 = [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md).
 
 ## 스택
 - Next.js 16 (App Router) · React 19 · TypeScript · Tailwind v4
@@ -19,6 +20,7 @@
 - 외부 검색 API 키·신뢰성 중요한 쓰기는 **서버**에서. REST 검색 키/서비스롤 키/어드민 비밀번호는 클라이언트 노출 금지(`NEXT_PUBLIC_` 붙이지 말 것).
 - UI 문구는 한국어. 문서/주석 한국어 OK, 파일명은 영문.
 - 데이터 모델은 PRD 7장 개정판 기준: `submission`=후보 정본 / `selection`=투표(map_id 없음) / `map_pin`=담기. place dedup = `(external_provider, external_place_id)`.
+- **문서**: 새 프로젝트 문서는 `docs/`에 추가하고 [`docs/README.md`](docs/README.md)의 인덱스·헤더 규칙을 따른다. 의미 있는 작업이 끝나면 [`docs/STATUS.md`](docs/STATUS.md)를 갱신. 중요한 결정은 `docs/decisions/`에 ADR로 남긴다.
 
 ## 디자인 결정 기준 (중요)
 - 사용자는 디자인 비전문가 → 디자인 결정은 항상 **추천안 + 근거**로 제시(결정 위임받음, 매번 다시 묻지 말 것).
@@ -29,4 +31,4 @@
 
 ## 현재 작업 트랙 (시드-우선)
 운영자 어드민(`/admin`, env 비밀번호 게이트)으로 시드 데이터부터 축적 → 공개 지도 뷰 → 이후 소비자 핵심 루프.
-순서는 `DEVELOPMENT_PLAN.md`의 "현재 작업 트랙" 표 참조.
+순서는 [`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md)의 "현재 작업 트랙" 표 참조. 진행 상태는 [`docs/STATUS.md`](docs/STATUS.md).

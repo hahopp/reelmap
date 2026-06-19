@@ -1,5 +1,6 @@
 # ReelMap (릴맵) — MVP 기획서
 
+> **역할**: 제품 기획·데이터모델·신뢰도·지표(스펙) · **대상**: AI 에이전트·사람 · **안정성**: 🟢 안정 · **연관**: [STATUS.md](STATUS.md) 상태 · [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) 단계 · [ARCHITECTURE.md](ARCHITECTURE.md) 구조
 > 작업명: ReelMap (Instagram Reel + Map) · 이름은 잠정
 > 버전: v0.6 (MVP 기획) · 최종수정: 2026-06-15
 

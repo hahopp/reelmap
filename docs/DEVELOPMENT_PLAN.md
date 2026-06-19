@@ -1,5 +1,6 @@
 # ReelMap — 개발 계획 (Phased Build Plan)
 
+> **역할**: 단계 계획 Phase 0~5·마일스톤·DoD · **대상**: AI 에이전트·사람 · **안정성**: 🟢 안정 · **연관**: [STATUS.md](STATUS.md) 현재 상태 · [PRD.md](PRD.md) 기획 · [ARCHITECTURE.md](ARCHITECTURE.md) 구조
 > 기준 문서: `PRD.md` (v0.6) · 최종수정: 2026-06-15
 > 스택: Next.js 16(App Router, TS) · React 19 · Tailwind v4 · 지도/검색=카카오(어댑터 격리·네이버 교체 대비) · Supabase(Postgres+Auth) · PostHog · Vercel
 
