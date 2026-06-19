@@ -7,8 +7,9 @@
 ---
 
 ## ▶ 내일 이어서 (추천 시작점)
-- **M2 증분 2 — 담기(쓰기 절반)**: Supabase 익명 로그인 켠 뒤 → 후보 선택 → `selection`+`map_pin` 저장(내 지도 자동 생성). 익명 인증이 선행조건.
-- **운영자 브라우저 작업 2개(코드로 불가)**: ① 카카오 Developers에 `https://reelmap-teal.vercel.app` 도메인 등록(지도 뜨려면 필수, 현재 localhost만) ② Supabase **Anonymous sign-ins** 활성화(M2 쓰기용).
+- **M2 증분 3 — 새 장소 추가**: 후보 없는 릴에서 검색/지도클릭으로 장소 직접 추가(어드민 PlaceRegister 로직 소비자용 경량화). 익명 신원 재사용.
+- **M2 증분 4 — 내 지도 뷰/관리**: 담은 핀 모아보기(PublicMapView 재사용) + 핀 제거.
+- **카카오 도메인 등록 대기(운영자, 코드 불가)**: Kakao Developers에 `https://reelmap-teal.vercel.app` 추가해야 `/find`·`/explore`·`/m` 지도가 뜸(현재 localhost만).
 - 그 외 백로그는 맨 아래 참고.
 
 ---
@@ -23,7 +24,7 @@
 - ✅ 카카오 앱: JS/REST 키, 카카오맵 활성화, `http://localhost:3000` 등록
 - ✅ `.env.local` 키 세팅, git `main` 커밋 누적
 - ✅ **Vercel 프로덕션 배포**(`hahao/reelmap`, `https://reelmap-teal.vercel.app`) — env 6개 Vercel 등록(prod+preview)
-- ⏳ PostHog 전 · **카카오 도메인 등록 대기**(지도 렌더) · **Supabase 익명 토글 대기**(M2 쓰기)
+- ✅ **Supabase 익명 로그인 활성화**(M2 담기 동작) · ⏳ PostHog 전 · **카카오 도메인 등록 대기**(지도 렌더)
 
 ---
 
@@ -37,7 +38,7 @@
 
 ### 공개(비로그인)
 - **`/` 홈** — **인스타 링크 입력 히어로**(붙여넣기 → `/find`) + 큐레이션 시드맵 카드 그리드(반응형 1→2→3열), 커버(이미지/그라데이션+이모지) + **hover 확대**.
-- **`/find` 후보 조회 (M2 핵심 루프 읽기 절반)** — 링크 정규화 → 해당 릴의 후보 장소 + **신뢰도 라벨**(공식시드/N명선택/확인됨/미확인) + 지도, 빈 상태·오류 상태. anon+RLS 공개 읽기(서비스롤 불필요).
+- **`/find` 후보 조회 + 담기 (M2 핵심 루프)** — 링크 정규화 → 후보 장소 + **신뢰도 라벨**(공식시드/N명선택/확인됨/미확인) + 지도(anon+RLS 공개 읽기). **"내 지도에 담기"**: 익명 인증(`signInAnonymously`) → access_token 서버 검증 → `selection`(1표)+`map_pin` 저장(내 지도 자동 생성) → "내 지도 보기" 링크. 빈/오류 상태 포함.
 - **`/m/[share_token]` 공개 지도** — 화면 꽉 채움(페이지 스크롤 X, 목록만 내부 스크롤), 커버 배너, **번호 핀 마커 ↔ 번호 카드**, 메모·태그 표시, 인스타 **아이콘 버튼**(1:N 다 표시), 태그 칩 필터, ←홈.
   - **인터랙션**: 카드 hover(부상+그림자) · 카드 클릭 → 지도 panTo+확대(level 8) · **마커 클릭 → 카드 강조+스크롤**(양방향) · 선택 카드 ring.
 - **`/explore` 전체 지도** — 모든 공개 장소 + 태그 칩 필터(AND, URL 공유). *(참고: 아직 페이지 스크롤형 — 뷰포트 맞춤 미적용)*
@@ -52,8 +53,8 @@
 
 ### 코어 모듈
 - `lib/instagram.ts`(URL→post_id, vitest 16) · `lib/places/`(searchPlaces·transcoord·coord2address) · `lib/kakao-url.ts`(map.kakao URL 파싱) · `lib/tags.ts`(태그 파싱) · `lib/trust.ts`(신뢰도 라벨) · `lib/public-lookup.ts`(공개 후보 조회 anon+RLS)
-- `lib/maps.ts` · `lib/pins.ts` · `lib/public-maps.ts` · `lib/supabase/server.ts`
-- `components/map/MapView.tsx`(카카오 SDK·번호마커·focus 이동·마커 클릭) · `app/m/[share_token]/PublicMapView.tsx`(인터랙티브 본문) · `app/explore/TagFilter.tsx`(basePath 공용) · `components/icons/instagram.tsx` · `components/LinkInput.tsx`(홈 링크 입력)
+- `lib/maps.ts` · `lib/pins.ts` · `lib/public-maps.ts` · `lib/consumer.ts`(담기 쓰기·토큰 검증) · `lib/supabase/server.ts` · `lib/supabase/client.ts`(브라우저 익명)
+- `components/map/MapView.tsx`(카카오 SDK·번호마커·focus 이동·마커 클릭) · `app/m/[share_token]/PublicMapView.tsx`(인터랙티브 본문) · `app/explore/TagFilter.tsx`(basePath 공용) · `components/icons/instagram.tsx` · `components/LinkInput.tsx`(홈 링크 입력) · `components/SaveCandidateButton.tsx`(담기) · `app/find/actions.ts`(담기 서버액션)
 
 ### 디자인
 - shadcn/ui + **감성·내추럴 토큰**(크림+그린, oklch, radius 0.75rem), Pretendard, 반응형 모바일 우선. 기준은 `CLAUDE.md`.
@@ -62,12 +63,12 @@
 
 ## 검증 / 명령어
 - `npm test`(vitest 16) · `npm run build` / `npx tsc --noEmit` green
-- 스모크(`scripts/`): check-db · smoke-map/kakao/register/public/cover · **smoke-find**(소비자 후보 조회 anon RLS) · list-maps · seed-demo · demo-tag · backfill-address
+- 스모크(`scripts/`): check-db · smoke-map/kakao/register/public/cover · **smoke-find/anon/save**(소비자 조회·익명로그인·담기 end-to-end) · list-maps · seed-demo · demo-tag · backfill-address
 - `npm run dev` · 마이그레이션은 Supabase SQL Editor · 어드민 비번 = `.env.local` ADMIN_PASSWORD · 공개 URL: `node scripts/list-maps.mjs`
 
 ---
 
 ## 다음 후보 (백로그)
-- ⭐ **M2 소비자 핵심 루프 쓰기 절반**(익명 인증 → 후보 선택/새 장소 추가 → 내 지도 담기) · **소셜 로그인**(Phase 3)
+- ⭐ **M2 증분 3·4**(새 장소 추가 · 내 지도 뷰/관리) · **소셜 로그인**(Phase 3, 익명→영구 계정 link로 데이터 승격)
 - 공유 미리보기(OG) · `/explore` 뷰포트 맞춤 · 선택된 **마커 자체 강조** · 지도 로딩 스켈레톤 · 홈 커버 hover 줌
 - 필터→기획전 저장(스마트 지도) · 신뢰도 라벨 UI · 신고 처리 · PostHog 계측 · 커버 이미지 업로드(현재 URL) · 네이버 전환(옵션)
