@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { listSeedMaps } from '@/lib/public-maps'
+import LinkInput from '@/components/LinkInput'
 
 // 커버 장식 (실사진 아님 — 그라데이션 + 이모지). index로 순환.
 const COVERS = [
@@ -24,8 +25,12 @@ export default async function Home() {
         <p className="max-w-md text-balance text-muted-foreground">
           인스타에서 본 그 장소, 어디인지 궁금하셨죠?
           <br />
-          주제별로 지도를 모았어요.
+          링크를 붙여넣으면 어디인지 찾아드려요.
         </p>
+        <div className="mt-2 flex w-full flex-col items-center gap-1.5">
+          <LinkInput />
+          <span className="text-xs text-muted-foreground">또는 아래 큐레이션 지도를 둘러보세요</span>
+        </div>
       </section>
 
       {/* 큐레이션 지도 둘러보기 */}
