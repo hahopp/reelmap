@@ -79,17 +79,19 @@ async function instaCodesByPlace(
 }
 
 /**
- * 시드 등록 핵심: 인스타 링크 + 검색으로 고른 장소를 지도에 담는다.
- * content(UPSERT) → place(dedup UPSERT) → submission(source='seed') → map_pin
+ * 장소 확정 핵심(지도 비의존): 인스타 링크 + 장소를 catalog 에 등록한다.
+ * content(UPSERT) → place(dedup UPSERT) → submission(source='seed').
+ * 지도 담기(map_pin)는 registerSeedPlaceToMap / addPlacesToMap 에서 별도.
+ * @returns 생성/연결된 placeId 와 정규화된 postId
  */
-export async function registerSeedPlaceToMap(input: {
-  mapId: string
+export async function registerSeedPlace(input: {
   instagramUrl: string
   place: NormalizedPlace
-  typeKey?: string
-  note?: string
+  category?: string // 주제(선택). 없으면 null — 주제 일반 서비스
+  typeKey?: string // 카테고리 하위 유형(선택). category 와 함께 place_type 에 있어야 FK 통과
   tags?: string[]
-}): Promise<void> {
+  description?: string
+}): Promise<{ placeId: string; postId: string }> {
   const norm = normalizeInstagramUrl(input.instagramUrl)
   if (!norm) throw new Error('유효한 인스타그램 링크가 아닙니다')
 
@@ -134,8 +136,8 @@ export async function registerSeedPlaceToMap(input: {
           name: p.name,
           lat: p.lat,
           lng: p.lng,
-          category: 'camping',
-          type_key: input.typeKey ?? 'general',
+          category: input.category ?? null,
+          type_key: input.typeKey ?? null,
           external_provider: p.provider,
           external_place_id: p.externalId,
           address,
@@ -166,10 +168,13 @@ export async function registerSeedPlaceToMap(input: {
     placeId = created.id as string
   }
 
-  // 태그가 입력되면 place에 반영(등록 시 지정)
-  if (input.tags && input.tags.length > 0) {
-    const { error: te } = await db.from('place').update({ tags: input.tags }).eq('id', placeId)
-    if (te) throw new Error('tags: ' + te.message)
+  // 태그/설명이 입력되면 place 에 반영(확정 시 지정)
+  const patch: Record<string, unknown> = {}
+  if (input.tags && input.tags.length > 0) patch.tags = input.tags
+  if (input.description != null && input.description.trim()) patch.description = input.description.trim()
+  if (Object.keys(patch).length > 0) {
+    const { error: te } = await db.from('place').update(patch).eq('id', placeId)
+    if (te) throw new Error('place 갱신: ' + te.message)
   }
 
   // 3) submission 업서트 (콘텐츠 × 장소 후보, 시드 출처)
@@ -185,9 +190,31 @@ export async function registerSeedPlaceToMap(input: {
   )
   if (se) throw new Error('submission: ' + se.message)
 
-  // 4) map_pin (지도에 담기)
+  return { placeId, postId: norm.postId }
+}
+
+/**
+ * 시드 등록: registerSeedPlace + 지도에 담기(map_pin).
+ * 기존 어드민 PlaceRegister 진입점(동작 무회귀).
+ */
+export async function registerSeedPlaceToMap(input: {
+  mapId: string
+  instagramUrl: string
+  place: NormalizedPlace
+  typeKey?: string
+  note?: string
+  tags?: string[]
+}): Promise<void> {
+  const { placeId, postId } = await registerSeedPlace({
+    instagramUrl: input.instagramUrl,
+    place: input.place,
+    typeKey: input.typeKey,
+    tags: input.tags,
+  })
+
+  const db = createAdminClient()
   const { error: me } = await db.from('map_pin').upsert(
-    { map_id: input.mapId, place_id: placeId, content_id: norm.postId, note: input.note ?? null },
+    { map_id: input.mapId, place_id: placeId, content_id: postId, note: input.note ?? null },
     { onConflict: 'map_id,place_id' },
   )
   if (me) throw new Error('map_pin: ' + me.message)
@@ -338,5 +365,130 @@ export async function updatePinContent(input: {
     { onConflict: 'content_id,place_id' },
   )
   const { error } = await db.from('map_pin').update({ content_id: norm.postId }).eq('id', input.pinId)
+  if (error) throw new Error(error.message)
+}
+
+export interface PlaceListRow {
+  id: string
+  name: string
+  roadAddress: string | null
+  address: string | null
+  description: string | null
+  tags: string[]
+  instaCodes: string[] // 연결된 인스타 콘텐츠 코드(submission)
+  mapCount: number // 담긴 지도 수(0 = 아직 어느 지도에도 안 담김)
+}
+
+/** 전체 장소 목록(편성용). 태그 contains(AND) + 이름 부분일치 필터. */
+export async function listPlaces(opts?: { tags?: string[]; q?: string }): Promise<PlaceListRow[]> {
+  const db = createAdminClient()
+  let query = db
+    .from('place')
+    .select('id, name, road_address, address, description, tags')
+    .order('created_at', { ascending: false })
+  if (opts?.tags && opts.tags.length > 0) query = query.contains('tags', opts.tags)
+  if (opts?.q && opts.q.trim()) query = query.ilike('name', `%${opts.q.trim()}%`)
+  const { data: places, error } = await query
+  if (error) throw new Error(error.message)
+  if (!places || places.length === 0) return []
+
+  // 장소별 담긴 지도 수
+  const ids = places.map((p) => p.id as string)
+  const { data: pins } = await db.from('map_pin').select('place_id').in('place_id', ids)
+  const countByPlace = new Map<string, number>()
+  for (const pin of pins ?? []) {
+    const k = pin.place_id as string
+    countByPlace.set(k, (countByPlace.get(k) ?? 0) + 1)
+  }
+  const codesByPlace = await instaCodesByPlace(db, ids)
+
+  return places.map((p) => ({
+    id: p.id as string,
+    name: p.name as string,
+    roadAddress: (p.road_address as string | null) ?? null,
+    address: (p.address as string | null) ?? null,
+    description: (p.description as string | null) ?? null,
+    tags: (p.tags as string[] | null) ?? [],
+    instaCodes: codesByPlace.get(p.id as string) ?? [],
+    mapCount: countByPlace.get(p.id as string) ?? 0,
+  }))
+}
+
+/** 선택한 장소들을 한 지도에 일괄 담기(map_pin upsert, 중복 무시). @returns 시도 건수 */
+export async function addPlacesToMap(mapId: string, placeIds: string[], note?: string): Promise<number> {
+  if (placeIds.length === 0) return 0
+  const db = createAdminClient()
+  const rows = placeIds.map((placeId) => ({ map_id: mapId, place_id: placeId, note: note ?? null }))
+  const { error } = await db
+    .from('map_pin')
+    .upsert(rows, { onConflict: 'map_id,place_id', ignoreDuplicates: true })
+  if (error) throw new Error(error.message)
+  return placeIds.length
+}
+
+/** 태그 통제 어휘(룩업) 조회 — AI 추출·어드민 UI 가 참조. */
+export async function listPlaceTags(): Promise<{ key: string; label: string; category: string | null }[]> {
+  const db = createAdminClient()
+  const { data, error } = await db
+    .from('place_tag')
+    .select('key, label, category')
+    .order('sort', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((t) => ({
+    key: t.key as string,
+    label: t.label as string,
+    category: (t.category as string | null) ?? null,
+  }))
+}
+
+/** 선택한 장소들을 catalog 에서 영구 삭제. 연결된 report→submission(→selection cascade)→map_pin 정리 후 place 삭제. */
+export async function deletePlaces(placeIds: string[]): Promise<number> {
+  if (placeIds.length === 0) return 0
+  const db = createAdminClient()
+
+  const { data: subs, error: se } = await db.from('submission').select('id').in('place_id', placeIds)
+  if (se) throw new Error('submission 조회: ' + se.message)
+  const subIds = (subs ?? []).map((s) => s.id as string)
+  if (subIds.length > 0) {
+    const { error: re } = await db.from('report').delete().in('target_submission_id', subIds)
+    if (re) throw new Error('report 삭제: ' + re.message)
+    const { error: de } = await db.from('submission').delete().in('id', subIds) // selection 은 ON DELETE CASCADE
+    if (de) throw new Error('submission 삭제: ' + de.message)
+  }
+  const { error: me } = await db.from('map_pin').delete().in('place_id', placeIds)
+  if (me) throw new Error('map_pin 삭제: ' + me.message)
+  const { error: pe } = await db.from('place').delete().in('id', placeIds)
+  if (pe) throw new Error('place 삭제: ' + pe.message)
+  return placeIds.length
+}
+
+/** 장소 정보 수정(부분). 좌표/external 은 카카오 재선택 시에만 같이 넘긴다. */
+export async function updatePlace(
+  placeId: string,
+  patch: {
+    name?: string
+    address?: string | null
+    roadAddress?: string | null
+    lat?: number
+    lng?: number
+    externalProvider?: string | null
+    externalId?: string | null
+    description?: string | null
+    tags?: string[]
+  },
+): Promise<void> {
+  const row: Record<string, unknown> = {}
+  if (patch.name !== undefined) row.name = patch.name
+  if (patch.address !== undefined) row.address = patch.address
+  if (patch.roadAddress !== undefined) row.road_address = patch.roadAddress
+  if (patch.lat !== undefined) row.lat = patch.lat
+  if (patch.lng !== undefined) row.lng = patch.lng
+  if (patch.externalProvider !== undefined) row.external_provider = patch.externalProvider
+  if (patch.externalId !== undefined) row.external_place_id = patch.externalId
+  if (patch.description !== undefined) row.description = patch.description
+  if (patch.tags !== undefined) row.tags = patch.tags
+  if (Object.keys(row).length === 0) return
+  const db = createAdminClient()
+  const { error } = await db.from('place').update(row).eq('id', placeId)
   if (error) throw new Error(error.message)
 }

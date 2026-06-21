@@ -1,8 +1,17 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { requireAdmin } from '@/lib/admin/auth'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { requireAdmin, ADMIN_COOKIE } from '@/lib/admin/auth'
 import { createMap, deleteMap, updateMap, type MapVisibility } from '@/lib/maps'
+
+/** 어드민 로그아웃 — 세션 쿠키 삭제 후 로그인으로. */
+export async function logoutAction() {
+  const store = await cookies()
+  store.delete(ADMIN_COOKIE)
+  redirect('/admin/login')
+}
 
 export async function createMapAction(formData: FormData) {
   await requireAdmin()

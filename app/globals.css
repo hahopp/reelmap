@@ -128,5 +128,8 @@
   }
   html {
     @apply font-sans;
+    /* 스크롤바 항상 표시 + 거터 예약 → 내용 높이 변동 시 가로폭 흔들림 방지 */
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
   }
 }

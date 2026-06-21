@@ -1,7 +1,4 @@
 import Link from 'next/link'
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
-import { ADMIN_COOKIE } from '@/lib/admin/auth'
 import { listMaps } from '@/lib/maps'
 import { createMapAction, deleteMapAction, toggleSeedAction } from './actions'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -12,23 +9,9 @@ import { Badge } from '@/components/ui/badge'
 export default async function AdminHomePage() {
   const maps = await listMaps()
 
-  async function logout() {
-    'use server'
-    const store = await cookies()
-    store.delete(ADMIN_COOKIE)
-    redirect('/admin/login')
-  }
-
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">어드민 — 지도</h1>
-        <form action={logout}>
-          <Button type="submit" variant="ghost" size="sm">
-            로그아웃
-          </Button>
-        </form>
-      </div>
+      <h1 className="text-2xl font-bold tracking-tight">지도</h1>
 
       {/* 새 지도 생성 */}
       <Card>

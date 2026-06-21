@@ -17,6 +17,7 @@
 | **T2** | **어드민 콘솔 `/admin`**(비밀번호 게이트) — 지도 CRUD · 인스타링크+장소 등록(카카오 검색→좌표·dedup) · 지도 핀 추가/제거. 저장물=`submission(source='seed')`+`map_pin`, `is_seed` 지도 | Phase 4 시드 + 신규 |
 | **T3** | **기획전 public 시드맵 콘텐츠 채우기**(운영자가 T2로 입력) | Phase 5 시드 채우기 |
 | **T4** | **Public 지도 뷰**(비로그인 열람, 지도에 핀 렌더, 유저맵 noindex·시드맵 인덱싱) | Phase 4 공개뷰 |
+| **T5** | **운영자 인제스트 파이프라인** — 인스타 raw 포착(`/admin/capture`) → AI 정제(`/api/captures` 루프) → 확정(`/admin/review`, 지도 없이 catalog) → 태그 기반 지도 편성(`/admin/places`). 상세=[ADR 0002](decisions/0002-instagram-ingest-pipeline.md) | Phase 4 시드 확장 + 신규 |
 | 이후 | 소비자 핵심 루프(링크 조회→선택/추가→내 지도), 인증, 신고 등 | Phase 2·3 본류 |
 
 **결정(2026-06-15)**: 지도/검색은 **카카오로 시작**(검색 결과 多·place id로 dedup 유리) + `lib/places` 어댑터로 격리 → 추후 네이버 교체는 어댑터+지도 컴포넌트 교체로 한정(좌표 WGS84 저장이라 데이터 마이그레이션 불필요). 어드민 보호 = **env 비밀번호 게이트**(단일 운영자 MVP).

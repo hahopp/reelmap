@@ -3,7 +3,7 @@
 > **역할**: 프로젝트 현재 상태 + 작업한 것 + 작업할 것. **작업 추적의 단일 진실원천.**
 > **대상**: AI 에이전트 · 사람
 > **안정성**: 🔴 변동 — 의미 있는 작업이 끝날 때마다 갱신한다(아래 "갱신 규칙").
-> **최종수정**: 2026-06-19
+> **최종수정**: 2026-06-21
 > **연관**: [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) 단계 상세 · [ARCHITECTURE.md](ARCHITECTURE.md) 코드 구조 · [PRD.md](PRD.md) 기획
 
 한 줄: 인스타에서 본 **그 장소를 주제별 지도로** 모아 공유. 포지셔닝=장소 일반(주제별) / 첫 버티컬·시딩=캠핑.
@@ -32,7 +32,7 @@
 
 자세한 코드 위치는 [ARCHITECTURE.md](ARCHITECTURE.md), 변경 이력은 `git log`.
 
-- **인프라**: Next 16 스캐폴드 · Supabase(스키마 3차: `0001_init`/`0002_map_cover`/`0003_place_tags`) · 카카오 JS/REST 키 · Vercel 프로덕션 배포 · 디자인 토큰(크림+그린, Pretendard)
+- **인프라**: Next 16 스캐폴드 · Supabase(스키마 4차: `0001_init`/`0002_map_cover`/`0003_place_tags`/`0004_ingest_pipeline`) · 카카오 JS/REST 키 · Vercel 프로덕션 배포 · 디자인 토큰(크림+그린, Pretendard)
 - **데이터 모델**: 9테이블 + RLS + place dedup`(external_provider, external_place_id)` + WGS84 + `tags[]`. `submission`(후보)/`selection`(투표, 1계정1표)/`map_pin`(담기) 역할 분리
 - **어드민 콘솔 `/admin`** (비번 게이트): 지도 CRUD+수정 · 3탭 장소 등록(카카오URL/검색/지도클릭) · 인스타 1:N · 핀 태그/메모 · 좌표→주소 역지오코딩
 - **공개 뷰**: `/`(시드맵 그리드 + 링크입력 히어로) · `/m/[share_token]`(뷰포트맞춤·번호마커↔카드 양방향·태그필터) · `/explore`(전체 장소·태그 AND 필터)
@@ -40,8 +40,15 @@
   - 읽기 — `/find`: 링크 정규화 → 후보 + 신뢰도 라벨(공식시드/N명선택/확인됨/미확인) + 지도, 빈/오류 상태
   - 쓰기 — "내 지도에 담기": 익명 인증(`signInAnonymously`) → access_token 서버 검증 → `selection`(1표)+`map_pin`(내 지도 자동 생성) → 내 지도 보기 링크
 - **코어 lib**: 인스타 정규화(16테스트) · 카카오 검색 어댑터 · kakao-url 파서 · tags 파서 · 신뢰도 라벨 · 공개 후보 조회(anon+RLS) · 담기 쓰기(토큰 검증)
+- **운영자 인제스트 파이프라인(ADR 0002 · 구현 완료, 운영자 적용 대기)**: ①포착 `/admin/capture`(raw 입력) → ②정제 `lib/refine.ts`(Claude Sonnet 4.6 + 카카오 자동매칭) / `/api/captures`(Bearer GET·PATCH·refine) → ③확정 `/admin/review`(`registerSeedPlace` 지도 비의존, content+place+submission) → ④편성 `/admin/places`(태그 AND 검색·체크·`addPlacesToMap` 벌크). 스테이징 `instagram_capture` + `place.description` + `place_tag` 어휘. tsc·lint·test(16/16)·build 모두 green
 
 ## 4. 🔜 작업할 것 (Todo, 우선순위순)
+
+### ★ 인제스트 파이프라인 후속(코드 완료 후 개선거리)
+- [ ] **운영자 적용**(아래 §6) 후 e2e 점검: 포착→정제→확정→편성 실제 데이터로 1회
+- [ ] `review`에서 인식 안 된 URL 수정 UI(현재 post_id null이면 확정 불가)
+- [ ] 다중 장소 캡처의 장소별 개별 확정(현재 캡처 단위 일괄 확정)
+- [ ] 정제 배치 트리거(여러 raw 한 번에) — 현재 1건씩
 
 ### A. M2 마무리 — 외부 의존성 없음, 바로 가능
 - [ ] **증분 3 · 새 장소 추가**: 후보 없는 릴에서 검색/지도클릭으로 직접 추가(어드민 `PlaceRegister` 로직 소비자용 경량화, 익명 신원 재사용) → `place`+`submission`+`selection`+`map_pin`
@@ -75,6 +82,8 @@
 
 - ✅ 카카오 Developers Web 플랫폼에 `https://reelmap-teal.vercel.app` 도메인 등록(지도 렌더)
 - ✅ Supabase Authentication → Anonymous sign-ins 활성화(M2 담기)
+- ⏳ **(인제스트)** `supabase/migrations/0004_ingest_pipeline.sql` 을 Supabase SQL Editor 에 적용
+- ⏳ **(인제스트)** env 추가(Vercel + `.env.local`): `ANTHROPIC_API_KEY`(Claude) · `INGEST_API_TOKEN`(capture API Bearer, 길고 무작위)
 - ⏳ (Phase 5) PostHog 프로젝트 키 → Vercel env (`NEXT_PUBLIC_POSTHOG_KEY`)
 - ⏳ (출시) 커스텀 도메인 연결 + 카카오 도메인에 추가 등록
 
