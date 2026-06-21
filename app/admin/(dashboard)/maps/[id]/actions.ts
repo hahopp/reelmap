@@ -2,8 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/admin/auth'
-import { searchPlaces } from '@/lib/places'
-import { kakaoWcongToWgs84, kakaoCoord2Address } from '@/lib/places/kakao'
+import { searchPlaces, wcongToWgs84, coord2address } from '@/lib/places'
 import type { NormalizedPlace } from '@/lib/places/types'
 import { parseKakaoMapUrl } from '@/lib/kakao-url'
 import {
@@ -13,7 +12,6 @@ import {
   setPinNote,
   listCandidatesForContent,
   addExistingPlaceToMap,
-  updatePinContent,
   addPlaceInstaLink,
   removePlaceInstaLink,
   type CandidatePlace,
@@ -67,11 +65,11 @@ export async function previewKakaoUrlAction(
     return { ok: false, error: '좌표가 담긴 카카오맵 URL이 아니에요 (urlX/urlY 필요).' }
   }
   try {
-    const { lat, lng } = await kakaoWcongToWgs84(parsed.wcongX, parsed.wcongY)
+    const { lat, lng } = await wcongToWgs84(parsed.wcongX, parsed.wcongY)
     let address: string | null = null
     let roadAddress: string | null = null
     try {
-      const a = await kakaoCoord2Address(lng, lat)
+      const a = await coord2address(lng, lat)
       address = a.address
       roadAddress = a.roadAddress
     } catch {
@@ -161,17 +159,6 @@ export async function updatePinNoteAction(formData: FormData) {
   const mapId = String(formData.get('mapId') ?? '')
   if (!pinId) return
   await setPinNote(pinId, String(formData.get('note') ?? '').trim())
-  revalidatePath(`/admin/maps/${mapId}`)
-}
-
-export async function updatePinContentAction(formData: FormData) {
-  await requireAdmin()
-  const pinId = String(formData.get('pinId') ?? '')
-  const placeId = String(formData.get('placeId') ?? '')
-  const mapId = String(formData.get('mapId') ?? '')
-  const instagramUrl = String(formData.get('instagramUrl') ?? '')
-  if (!pinId || !placeId || !normalizeInstagramUrl(instagramUrl)) return
-  await updatePinContent({ pinId, placeId, instagramUrl })
   revalidatePath(`/admin/maps/${mapId}`)
 }
 

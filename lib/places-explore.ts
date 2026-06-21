@@ -1,5 +1,6 @@
 import 'server-only'
 import { createAnonClient } from './supabase/server'
+import { instaCodesByPlace } from './insta-codes'
 
 export interface ExplorePlace {
   id: string
@@ -23,20 +24,7 @@ export async function listExplorePlaces(tags: string[]): Promise<ExplorePlace[]>
 
   // 장소별 인스타 코드(submission content_id) 묶기 (anon + RLS 공개 읽기)
   const ids = places.map((p) => p.id as string)
-  const codesByPlace = new Map<string, string[]>()
-  if (ids.length > 0) {
-    const { data: subs } = await db
-      .from('submission')
-      .select('place_id, content_id')
-      .in('place_id', ids)
-      .neq('status', 'hidden')
-    for (const s of subs ?? []) {
-      const k = s.place_id as string
-      const arr = codesByPlace.get(k) ?? []
-      arr.push(s.content_id as string)
-      codesByPlace.set(k, arr)
-    }
-  }
+  const codesByPlace = await instaCodesByPlace(db, ids)
 
   return places.map((p) => ({
     id: p.id as string,

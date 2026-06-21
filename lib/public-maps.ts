@@ -1,5 +1,6 @@
 import 'server-only'
 import { createAnonClient } from './supabase/server'
+import { instaCodesByPlace } from './insta-codes'
 import type { PinRow } from './pins'
 
 export interface PublicMap {
@@ -86,18 +87,7 @@ export async function listPublicMapPins(mapId: string): Promise<PinRow[]> {
 
   const byId = new Map((places ?? []).map((p) => [p.id as string, p]))
 
-  const codesByPlace = new Map<string, string[]>()
-  const { data: subs } = await db
-    .from('submission')
-    .select('place_id, content_id')
-    .in('place_id', placeIds)
-    .neq('status', 'hidden')
-  for (const s of subs ?? []) {
-    const k = s.place_id as string
-    const arr = codesByPlace.get(k) ?? []
-    arr.push(s.content_id as string)
-    codesByPlace.set(k, arr)
-  }
+  const codesByPlace = await instaCodesByPlace(db, placeIds)
 
   return pins.map((p) => {
     const pl = byId.get(p.place_id as string)

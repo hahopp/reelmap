@@ -2,8 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/admin/auth'
-import { searchPlaces } from '@/lib/places'
-import type { NormalizedPlace } from '@/lib/places/types'
 import {
   listPlaces,
   addPlacesToMap,
@@ -13,13 +11,6 @@ import {
   removePlaceInstaLink,
   type PlaceListRow,
 } from '@/lib/pins'
-
-/** 카카오 장소 검색(편집 시 위치 변경용). */
-export async function searchPlacesAction(query: string): Promise<NormalizedPlace[]> {
-  await requireAdmin()
-  if (!query.trim()) return []
-  return searchPlaces(query)
-}
 
 /** 장소 정보 수정(이름·주소·특징·태그 + 선택 시 위치). */
 export async function updatePlaceAction(input: {

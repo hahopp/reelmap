@@ -1,5 +1,5 @@
 import type { NormalizedPlace } from './types'
-import { kakaoSearchPlaces } from './kakao'
+import { kakaoSearchPlaces, kakaoWcongToWgs84, kakaoCoord2Address } from './kakao'
 
 export type { NormalizedPlace, PlaceProvider } from './types'
 
@@ -10,3 +10,8 @@ export type { NormalizedPlace, PlaceProvider } from './types'
 export function searchPlaces(query: string): Promise<NormalizedPlace[]> {
   return kakaoSearchPlaces(query)
 }
+
+/** 좌표(카카오 WCONGNAMUL) → WGS84. 제공자 교체 시 여기만 바꾼다. */
+export const wcongToWgs84 = kakaoWcongToWgs84
+/** WGS84(lng, lat) → 주소. 제공자 교체 시 여기만 바꾼다. */
+export const coord2address = kakaoCoord2Address

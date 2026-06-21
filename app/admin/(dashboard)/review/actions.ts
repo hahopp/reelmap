@@ -2,17 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/admin/auth'
-import { searchPlaces } from '@/lib/places'
-import type { NormalizedPlace } from '@/lib/places/types'
 import { getCapture, markCaptureConfirmed, setCaptureStatus, type ConfirmPlaceInput } from '@/lib/captures'
 import { registerSeedPlace } from '@/lib/pins'
-
-/** 카카오 장소 검색(선택하면 이름·주소·좌표 자동 입력). */
-export async function searchPlacesAction(query: string): Promise<NormalizedPlace[]> {
-  await requireAdmin()
-  if (!query.trim()) return []
-  return searchPlaces(query)
-}
 
 /**
  * 캡처의 장소들을 catalog 로 확정(content+place+submission, 지도 없음) → status='confirmed'.

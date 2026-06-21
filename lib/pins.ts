@@ -1,7 +1,8 @@
 import 'server-only'
 import { createAdminClient, OPERATOR_USER_ID } from './supabase/server'
 import { normalizeInstagramUrl } from './instagram'
-import { kakaoCoord2Address } from './places/kakao'
+import { coord2address } from './places'
+import { instaCodesByPlace } from './insta-codes'
 import type { NormalizedPlace } from './places/types'
 
 export interface PinRow {
@@ -57,27 +58,6 @@ export async function listMapPins(mapId: string): Promise<PinRow[]> {
   })
 }
 
-/** 여러 장소의 인스타 링크(submission content_ids) 조회 → place_id별 묶음 */
-async function instaCodesByPlace(
-  db: ReturnType<typeof createAdminClient>,
-  placeIds: string[],
-): Promise<Map<string, string[]>> {
-  const map = new Map<string, string[]>()
-  if (placeIds.length === 0) return map
-  const { data } = await db
-    .from('submission')
-    .select('place_id, content_id')
-    .in('place_id', placeIds)
-    .neq('status', 'hidden')
-  for (const s of data ?? []) {
-    const k = s.place_id as string
-    const arr = map.get(k) ?? []
-    arr.push(s.content_id as string)
-    map.set(k, arr)
-  }
-  return map
-}
-
 /**
  * 장소 확정 핵심(지도 비의존): 인스타 링크 + 장소를 catalog 에 등록한다.
  * content(UPSERT) → place(dedup UPSERT) → submission(source='seed').
@@ -103,7 +83,7 @@ export async function registerSeedPlace(input: {
   let roadAddress = p.roadAddress
   if (!address && !roadAddress) {
     try {
-      const a = await kakaoCoord2Address(p.lng, p.lat)
+      const a = await coord2address(p.lng, p.lat)
       address = a.address
       roadAddress = a.roadAddress
     } catch {
@@ -156,8 +136,8 @@ export async function registerSeedPlace(input: {
         name: p.name,
         lat: p.lat,
         lng: p.lng,
-        category: 'camping',
-        type_key: input.typeKey ?? 'general',
+        category: input.category ?? null,
+        type_key: input.typeKey ?? null,
         address,
         road_address: roadAddress,
         created_by: OPERATOR_USER_ID,
@@ -339,33 +319,6 @@ export async function addExistingPlaceToMap(input: {
     { onConflict: 'map_id,place_id' },
   )
   if (me) throw new Error('map_pin: ' + me.message)
-}
-
-/** 핀의 인스타 링크(콘텐츠) 교체 — 잘못 등록한 링크 수정용 */
-export async function updatePinContent(input: {
-  pinId: string
-  placeId: string
-  instagramUrl: string
-}): Promise<void> {
-  const norm = normalizeInstagramUrl(input.instagramUrl)
-  if (!norm) throw new Error('유효한 인스타그램 링크가 아닙니다')
-  const db = createAdminClient()
-
-  await db
-    .from('content')
-    .upsert({ id: norm.postId, source_url: norm.canonicalUrl, platform: 'instagram' }, { onConflict: 'id' })
-  await db.from('submission').upsert(
-    {
-      content_id: norm.postId,
-      place_id: input.placeId,
-      submitted_by: OPERATOR_USER_ID,
-      source: 'seed',
-      status: 'active',
-    },
-    { onConflict: 'content_id,place_id' },
-  )
-  const { error } = await db.from('map_pin').update({ content_id: norm.postId }).eq('id', input.pinId)
-  if (error) throw new Error(error.message)
 }
 
 export interface PlaceListRow {

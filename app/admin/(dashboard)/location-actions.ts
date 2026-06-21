@@ -3,7 +3,7 @@
 import { requireAdmin } from '@/lib/admin/auth'
 import { searchPlaces } from '@/lib/places'
 import type { NormalizedPlace } from '@/lib/places/types'
-import { kakaoWcongToWgs84, kakaoCoord2Address } from '@/lib/places/kakao'
+import { wcongToWgs84, coord2address } from '@/lib/places'
 import { parseKakaoMapUrl } from '@/lib/kakao-url'
 
 /** 이름/주소 검색. */
@@ -34,11 +34,11 @@ export async function previewKakaoUrlAction(
     return { ok: false, error: '좌표가 담긴 카카오맵 URL이 아니에요 (urlX/urlY 필요).' }
   }
   try {
-    const { lat, lng } = await kakaoWcongToWgs84(parsed.wcongX, parsed.wcongY)
+    const { lat, lng } = await wcongToWgs84(parsed.wcongX, parsed.wcongY)
     let address: string | null = null
     let roadAddress: string | null = null
     try {
-      const a = await kakaoCoord2Address(lng, lat)
+      const a = await coord2address(lng, lat)
       address = a.address
       roadAddress = a.roadAddress
     } catch {
@@ -57,7 +57,7 @@ export async function coord2addressAction(
 ): Promise<{ address: string | null; roadAddress: string | null }> {
   await requireAdmin()
   try {
-    const a = await kakaoCoord2Address(lng, lat)
+    const a = await coord2address(lng, lat)
     return { address: a.address, roadAddress: a.roadAddress }
   } catch {
     return { address: null, roadAddress: null }
