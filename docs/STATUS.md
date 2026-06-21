@@ -46,9 +46,11 @@
 
 ## 4. 🔜 작업할 것 (Todo, 우선순위순)
 
+> **▶ 다음 세션 시작점**: ① **prod 재배포**(`3d27d19` 미배포 — main이 prod보다 1커밋 앞섬) → ② **시드 콘텐츠 채우기**(파이프라인 존재 이유·아래 D) → ③ 양 많으면 **AI 정제 재개**, 또는 **소비자 루프 M2**(증분 3·4, 아래 A). · 2축 태깅 설계는 [ADR 0003](decisions/0003-tag-model-two-axis.md)(보류).
+
 ### ★ 인제스트 파이프라인 후속
 - [ ] **AI 정제 재개**(원하면): Vercel env(`ANTHROPIC_API_KEY`·`INGEST_API_TOKEN`) + `/admin/review`에 AI 버튼 복원(코드 dormant) + 정제 배치 트리거
-- [ ] **2축 태깅(유형/속성)** 도입 검토: `place_tag.category='type'` 통제 어휘 + 제안→승격(보류했던 설계). 현재는 태그 자유·`place_tag` 빈 상태
+- [ ] **2축 태깅(유형/속성)** 도입 검토 — 상세 [ADR 0003](decisions/0003-tag-model-two-axis.md): `place_tag.category='type'` 통제 어휘 + 제안→승격. 현재는 태그 자유·`place_tag` 빈 상태(보류)
 - [ ] 다중 장소 캡처의 **장소별 개별 확정**(현재 캡처 단위 일괄)
 - [ ] **공개 노출 정책**: 확정 = 즉시 `/explore` 공개 — 필요 시 "발행" 게이트 추가 검토
 - [ ] 장소 목록 **페이지네이션**(현재 무제한 — Supabase 1000행 상한)
