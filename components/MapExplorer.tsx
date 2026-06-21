@@ -31,6 +31,7 @@ export default function MapExplorer({
   filtered,
   emptyText = '아직 등록된 장소가 없어요.',
   noMatchText = '선택한 태그에 맞는 장소가 없어요.',
+  renderItemAction,
 }: {
   header: ReactNode
   items: ExplorerItem[]
@@ -39,6 +40,8 @@ export default function MapExplorer({
   filtered: boolean
   emptyText?: string
   noMatchText?: string
+  /** 카드 우상단에 표시할 항목별 액션(예: 제거 버튼). 카드 포커스와 분리(stopPropagation 처리됨). */
+  renderItemAction?: (item: ExplorerItem) => ReactNode
 }) {
   const [focus, setFocus] = useState<{ lat: number; lng: number } | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -86,7 +89,16 @@ export default function MapExplorer({
         ) : (
           <ul className="flex flex-col gap-3">
             {items.map((p, i) => (
-              <li key={p.id} id={`pin-${p.id}`}>
+              <li key={p.id} id={`pin-${p.id}`} className="relative">
+                {renderItemAction && (
+                  <div
+                    className="absolute right-2 top-2 z-10"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    {renderItemAction(p)}
+                  </div>
+                )}
                 <Card
                   size="sm"
                   role="button"
@@ -101,6 +113,7 @@ export default function MapExplorer({
                   className={cn(
                     'cursor-pointer transition duration-150 hover:-translate-y-0.5 hover:shadow-md hover:ring-foreground/25',
                     selectedId === p.id && 'ring-2 ring-primary',
+                    renderItemAction && 'pr-10',
                   )}
                 >
                   <CardHeader>

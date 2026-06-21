@@ -17,8 +17,17 @@ export default async function Home() {
   const maps = await listSeedMaps()
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-12 px-5 py-12 sm:py-16">
-      {/* 히어로 */}
+    <>
+      <header className="mx-auto flex w-full max-w-5xl items-center justify-end px-5 pt-5">
+        <Link
+          href="/my"
+          className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          📍 내 지도
+        </Link>
+      </header>
+      <main className="mx-auto flex w-full max-w-5xl flex-col gap-12 px-5 py-12 sm:py-16">
+        {/* 히어로 */}
       <section className="flex flex-col items-center gap-3 text-center">
         <span className="text-4xl">📍</span>
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">ReelMap</h1>
@@ -82,6 +91,7 @@ export default async function Home() {
           </div>
         )}
       </section>
-    </main>
+      </main>
+    </>
   )
 }

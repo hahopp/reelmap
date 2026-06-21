@@ -56,10 +56,7 @@ export default function SaveCandidateButton({
     return (
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="font-medium text-emerald-700">✓ 내 지도에 담겼어요</span>
-        <a
-          href={`/m/${shareToken}`}
-          className="font-medium text-primary underline-offset-4 hover:underline"
-        >
+        <a href="/my" className="font-medium text-primary underline-offset-4 hover:underline">
           내 지도 보기 →
         </a>
       </div>
