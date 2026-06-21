@@ -9,6 +9,7 @@ export interface ExplorePlace {
   address: string | null
   roadAddress: string | null
   tags: string[]
+  instaCodes: string[]
 }
 
 /** 전체 공개 장소 목록. tags가 있으면 그 태그를 "모두 포함"하는 장소만(AND). */
@@ -18,7 +19,26 @@ export async function listExplorePlaces(tags: string[]): Promise<ExplorePlace[]>
   if (tags.length > 0) q = q.contains('tags', tags)
   const { data, error } = await q.order('name')
   if (error) throw new Error(error.message)
-  return (data ?? []).map((p) => ({
+  const places = data ?? []
+
+  // 장소별 인스타 코드(submission content_id) 묶기 (anon + RLS 공개 읽기)
+  const ids = places.map((p) => p.id as string)
+  const codesByPlace = new Map<string, string[]>()
+  if (ids.length > 0) {
+    const { data: subs } = await db
+      .from('submission')
+      .select('place_id, content_id')
+      .in('place_id', ids)
+      .neq('status', 'hidden')
+    for (const s of subs ?? []) {
+      const k = s.place_id as string
+      const arr = codesByPlace.get(k) ?? []
+      arr.push(s.content_id as string)
+      codesByPlace.set(k, arr)
+    }
+  }
+
+  return places.map((p) => ({
     id: p.id as string,
     name: p.name as string,
     lat: p.lat as number,
@@ -26,6 +46,7 @@ export async function listExplorePlaces(tags: string[]): Promise<ExplorePlace[]>
     address: (p.address as string | null) ?? null,
     roadAddress: (p.road_address as string | null) ?? null,
     tags: (p.tags as string[] | null) ?? [],
+    instaCodes: codesByPlace.get(p.id as string) ?? [],
   }))
 }
 

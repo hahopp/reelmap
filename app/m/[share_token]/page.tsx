@@ -51,7 +51,6 @@ export default async function PublicMapPage({
         }}
         shareToken={share_token}
         pins={pins}
-        totalCount={allPins.length}
         allTags={allTags}
         selectedTags={selected}
       />

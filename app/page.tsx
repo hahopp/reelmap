@@ -35,9 +35,11 @@ export default async function Home() {
 
       {/* 큐레이션 지도 둘러보기 */}
       <section className="flex flex-col gap-4">
-        <div className="flex items-baseline justify-between">
+        <div className="flex items-baseline justify-between gap-2">
           <h2 className="text-lg font-semibold">큐레이션 지도</h2>
-          <span className="text-sm text-muted-foreground">{maps.length}개</span>
+          <Link href="/explore" className="text-sm font-medium text-primary hover:underline">
+            전체 장소 지도 →
+          </Link>
         </div>
 
         {maps.length === 0 ? (
