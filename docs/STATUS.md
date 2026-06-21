@@ -14,7 +14,7 @@
 
 - **라이브**: https://reelmap-teal.vercel.app (Vercel 프로덕션, `hahao/reelmap`)
 - **운영 게이트**: Vercel 배포 ✅ · 카카오 도메인 등록 ✅ · Supabase 익명 로그인 ✅
-- **동작하는 핵심**: 소비자 핵심 루프(M2) — 인스타 링크 → 후보 조회 → 내 지도에 담기 → **내 지도(`/my`) 보기·핀 제거·공유** (배포 URL에서 end-to-end). **Phase 2 DoD 충족.**
+- **동작하는 핵심**: 소비자 핵심 루프(M2) — 인스타 링크 → 후보 조회 → 내 지도에 담기 → **내 지도(`/my`) 보기·핀 제거·장소 직접 추가·공유** (배포 URL에서 end-to-end). **Phase 2 DoD 충족.**
 - **운영자 인제스트 배포됨(ADR 0002)**: 포착 → 검토·확정(수동) → 장소·편성 → 확정 즉시 `/explore` 공개. (AI 정제는 UI 미노출, 나중 재개)
 - **품질**: `npm test` 16/16 · `tsc --noEmit` · `npm run build` · `eslint` 모두 green · git `main` = 프로덕션 동기화
 
@@ -24,7 +24,7 @@
 |---|---|---|
 | 0 인프라 | ~100% | 배포·DB·키 완료. PostHog 키만 Phase 5 |
 | 1 데이터·백엔드 | ~90% | 9테이블·RLS·dedup·인스타정규화·신뢰도 라벨·투표집계 완료 |
-| **2 핵심 루프(M2)** | ~85% | 읽기+쓰기(담기)+내 지도 관리(뷰·핀 제거·공유) ✅ / 새 장소 추가(증분 3) 남음 |
+| **2 핵심 루프(M2)** | ~90% | 읽기+쓰기(담기)+내 지도 관리(뷰·핀 제거·장소 직접 추가·공유) ✅ / 새 장소 추가 고도화(URL/지도클릭·/find 무후보 진입) 남음 |
 | 3 인증·내 지도 | ~15% | 익명 인증 기반 생김 / 소셜로그인·계정승격·다중지도 남음 |
 | 4 공유·시드·신고 | ~60% | 공유·시드·공개뷰·담기 ✅ / 신고 UI·noindex·OG 남음 |
 | 5 계측·출시 | ~25% | PostHog·OG·베타 남음 |
@@ -41,6 +41,7 @@
   - 읽기 — `/find`: 링크 정규화 → 후보 + 신뢰도 라벨(공식시드/N명선택/확인됨/미확인) + 지도, 빈/오류 상태
   - 쓰기 — "내 지도에 담기": 익명 인증(`signInAnonymously`) → access_token 서버 검증 → `selection`(1표)+`map_pin`(내 지도 자동 생성) → 내 지도 보기 링크
   - **내 지도 관리(증분 4)** — `/my`(noindex, 익명 세션 기반): 담은 핀 모아보기(`MapExplorer` 재사용) + **핀 제거**(소유권 검증 + 투표 회수로 유령표 방지) + 공유 링크 복사. 빈/로딩/에러 상태. 홈·담기 후 진입 링크 `/my`. (`lib/consumer.ts` `getMyMapWithPins`/`removePinFromMyMap` · `app/my/*` · `components/RemovePinButton`)
+  - **장소 직접 추가(증분 3 일부)** — `/my`의 "+ 장소 추가" → 작은 다이얼로그(이름 검색→선택)로 내 지도에 바로 담기. 익명 세션 자동 생성. **릴 없는 개인 핀**(`content_id` 없음, `submission`/`selection` 안 만듦 — 크라우드 후보와 분리). (`lib/consumer.ts addPlaceToMyMap` + `ensureAppUser`/`ensureMyMap` 추출 · `app/my/actions.ts searchPlacesAction`/`addPlaceAction` · `components/AddPlaceDialog` · `components/ui/dialog`)
 - **코어 lib**: 인스타 정규화(16테스트) · 카카오 검색 어댑터 · kakao-url 파서 · tags 파서 · 신뢰도 라벨 · 공개 후보 조회(anon+RLS) · 담기 쓰기(토큰 검증)
 - **운영자 인제스트 파이프라인(ADR 0002 · 배포됨)**: ①포착 `/admin/capture`(URL+답장 raw, 펼침·등록일시) → ②검토·확정 `/admin/review`(카드 직접 입력 — 위치 3종[이름검색/카카오URL/지도클릭]·원문·특징·태그·인스타링크 수정/열기·다중장소 → `registerSeedPlace` 지도 비의존) → ③편성 `/admin/places`(인라인 편집·태그필터·일괄 담기/삭제·전체선택). 스테이징 `instagram_capture`+`place.description`+`place_tag`(빈 어휘). 주제 일반(category/type_key nullable). 어드민 공통 탭 네비. 공용 `LocationPicker`·`MapExplorer`로 입력/공개 UX 통일.
   - **AI 정제는 UI에서 제거(나중 재개)** — 코드는 `lib/refine.ts`(Claude)·`/api/captures`(Bearer)에 dormant. 현재 경로 = 수동 입력.
@@ -57,7 +58,7 @@
 - [ ] 장소 목록 **페이지네이션**(현재 무제한 — Supabase 1000행 상한)
 
 ### A. M2 마무리 — 외부 의존성 없음, 바로 가능
-- [ ] **증분 3 · 새 장소 추가**: 후보 없는 릴에서 검색/지도클릭으로 직접 추가(어드민 `PlaceRegister` 로직 소비자용 경량화, 익명 신원 재사용) → `place`+`submission`+`selection`+`map_pin`
+- [~] **증분 3 · 새 장소 추가**: `/my` "+ 장소 추가"(이름 검색→개인 핀) ✅(2026-06-22). 고도화 남음 — 카카오URL/지도클릭 입력, `/find` 무후보 진입, 릴 출처 연결(`submission`/`selection`) 옵션
 - [x] **증분 4 · 내 지도 뷰/관리**: `/my`에서 담은 핀 모아보기(`MapExplorer` 재사용) + 핀 제거(투표 회수) + 공유 ✅(2026-06-22)
 
 ### B. Phase 3 · 인증 & 내 지도

@@ -1,6 +1,9 @@
 import 'server-only'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAnonClient, createAdminClient } from './supabase/server'
+import { coord2address } from './places'
 import { listMapPins, type PinRow } from './pins'
+import type { NormalizedPlace } from './places/types'
 
 /**
  * 소비자 핵심 루프 쓰기 — 후보 선택(투표) + 내 지도에 담기.
@@ -18,63 +21,12 @@ export async function saveCandidateToMyMap(input: {
   placeId: string
   contentId: string
 }): Promise<SaveResult> {
-  // 1) 토큰 검증 → 진짜 익명 유저 uid (클라가 보낸 id를 신뢰하지 않음)
-  const auth = createAnonClient()
-  const {
-    data: { user },
-    error: ue,
-  } = await auth.auth.getUser(input.accessToken)
-  if (ue || !user) throw new Error('인증 세션이 유효하지 않습니다')
-  const uid = user.id
-
+  const uid = await verifyUid(input.accessToken)
   const db = createAdminClient()
+  const appUserId = await ensureAppUser(db, uid)
+  const { mapId, shareToken } = await ensureMyMap(db, appUserId)
 
-  // 2) app_user 보장 (auth_user_id = uid)
-  let appUserId: string
-  const { data: existingUser, error: e1 } = await db
-    .from('app_user')
-    .select('id')
-    .eq('auth_user_id', uid)
-    .maybeSingle()
-  if (e1) throw new Error('app_user 조회: ' + e1.message)
-  if (existingUser) {
-    appUserId = existingUser.id as string
-  } else {
-    const { data: created, error: e2 } = await db
-      .from('app_user')
-      .insert({ auth_user_id: uid, is_operator: false })
-      .select('id')
-      .single()
-    if (e2) throw new Error('app_user 생성: ' + e2.message)
-    appUserId = created.id as string
-  }
-
-  // 3) 내 지도 보장 (owner_id = appUserId, 가장 먼저 만든 지도 = 기본 내 지도)
-  let mapId: string
-  let shareToken: string
-  const { data: existingMap, error: e3 } = await db
-    .from('map')
-    .select('id, share_token')
-    .eq('owner_id', appUserId)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle()
-  if (e3) throw new Error('map 조회: ' + e3.message)
-  if (existingMap) {
-    mapId = existingMap.id as string
-    shareToken = existingMap.share_token as string
-  } else {
-    const { data: created, error: e4 } = await db
-      .from('map')
-      .insert({ owner_id: appUserId, title: '내 지도', visibility: 'unlisted' })
-      .select('id, share_token')
-      .single()
-    if (e4) throw new Error('map 생성: ' + e4.message)
-    mapId = created.id as string
-    shareToken = created.share_token as string
-  }
-
-  // 4) 투표(selection, 1계정 1표) + 담기(map_pin) — 둘 다 멱등 upsert
+  // 투표(selection, 1계정 1표) + 담기(map_pin) — 둘 다 멱등 upsert
   const { error: e5 } = await db
     .from('selection')
     .upsert(
@@ -103,6 +55,117 @@ async function verifyUid(accessToken: string): Promise<string> {
   } = await auth.auth.getUser(accessToken)
   if (error || !user) throw new Error('인증 세션이 유효하지 않습니다')
   return user.id
+}
+
+/** app_user 보장 (auth_user_id = uid). 없으면 생성. @returns app_user.id */
+async function ensureAppUser(db: SupabaseClient, uid: string): Promise<string> {
+  const { data: existing, error: e1 } = await db
+    .from('app_user')
+    .select('id')
+    .eq('auth_user_id', uid)
+    .maybeSingle()
+  if (e1) throw new Error('app_user 조회: ' + e1.message)
+  if (existing) return existing.id as string
+  const { data: created, error: e2 } = await db
+    .from('app_user')
+    .insert({ auth_user_id: uid, is_operator: false })
+    .select('id')
+    .single()
+  if (e2) throw new Error('app_user 생성: ' + e2.message)
+  return created.id as string
+}
+
+/** 내 지도 보장 (owner_id = appUserId, 가장 먼저 만든 지도 = 기본 내 지도). 없으면 생성. */
+async function ensureMyMap(
+  db: SupabaseClient,
+  appUserId: string,
+): Promise<{ mapId: string; shareToken: string }> {
+  const { data: existing, error: e3 } = await db
+    .from('map')
+    .select('id, share_token')
+    .eq('owner_id', appUserId)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (e3) throw new Error('map 조회: ' + e3.message)
+  if (existing) {
+    return { mapId: existing.id as string, shareToken: existing.share_token as string }
+  }
+  const { data: created, error: e4 } = await db
+    .from('map')
+    .insert({ owner_id: appUserId, title: '내 지도', visibility: 'unlisted' })
+    .select('id, share_token')
+    .single()
+  if (e4) throw new Error('map 생성: ' + e4.message)
+  return { mapId: created.id as string, shareToken: created.share_token as string }
+}
+
+/**
+ * 내 지도에 장소 직접 추가(릴 없는 개인 핀) — 검색/선택한 장소를 바로 담는다.
+ * place dedup upsert(external) + map_pin(content_id 없음). 투표(submission/selection)는 만들지 않음.
+ * @returns 새로(또는 기존) 핀의 placeId
+ */
+export async function addPlaceToMyMap(input: {
+  accessToken: string
+  place: NormalizedPlace
+}): Promise<{ placeId: string }> {
+  const uid = await verifyUid(input.accessToken)
+  const db = createAdminClient()
+  const appUserId = await ensureAppUser(db, uid)
+  const { mapId } = await ensureMyMap(db, appUserId)
+  const p = input.place
+
+  // 주소 없으면 좌표로 역지오코딩
+  let address = p.address
+  let roadAddress = p.roadAddress
+  if (!address && !roadAddress) {
+    try {
+      const a = await coord2address(p.lng, p.lat)
+      address = a.address
+      roadAddress = a.roadAddress
+    } catch {
+      // 주소 조회 실패는 무시(좌표만으로도 등록)
+    }
+  }
+
+  // place dedup upsert (external id 있으면 재사용)
+  let placeId: string | null = null
+  if (p.externalId) {
+    const { data: existing, error: fe } = await db
+      .from('place')
+      .select('id')
+      .eq('external_provider', p.provider)
+      .eq('external_place_id', p.externalId)
+      .maybeSingle()
+    if (fe) throw new Error('place 조회: ' + fe.message)
+    if (existing) placeId = existing.id as string
+  }
+  if (!placeId) {
+    const { data: created, error: pe } = await db
+      .from('place')
+      .insert({
+        name: p.name,
+        lat: p.lat,
+        lng: p.lng,
+        external_provider: p.externalId ? p.provider : null,
+        external_place_id: p.externalId,
+        address,
+        road_address: roadAddress,
+        created_by: appUserId,
+      })
+      .select('id')
+      .single()
+    if (pe) throw new Error('place 생성: ' + pe.message)
+    placeId = created.id as string
+  }
+
+  // 내 지도에 담기 (개인 핀 — content_id 없음). 이미 있으면 멱등.
+  const { error: me } = await db
+    .from('map_pin')
+    .upsert({ map_id: mapId, place_id: placeId }, { onConflict: 'map_id,place_id' })
+  if (me) throw new Error('map_pin: ' + me.message)
+
+  return { placeId }
 }
 
 export interface MyMap {

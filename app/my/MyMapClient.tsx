@@ -6,6 +6,7 @@ import { getBrowserSupabase } from '@/lib/supabase/client'
 import { getMyMapAction, removePinAction } from './actions'
 import MapExplorer, { type ExplorerItem } from '@/components/MapExplorer'
 import RemovePinButton from '@/components/RemovePinButton'
+import AddPlaceDialog from '@/components/AddPlaceDialog'
 import { Button, buttonVariants } from '@/components/ui/button'
 import type { PinRow } from '@/lib/pins'
 
@@ -28,45 +29,44 @@ export default function MyMapClient() {
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
-  useEffect(() => {
-    let alive = true
-    ;(async () => {
-      try {
-        const sb = getBrowserSupabase()
-        const {
-          data: { session },
-        } = await sb.auth.getSession()
-        // 익명 세션이 없으면 아직 담은 적 없는 사용자 — 새로 로그인하지 않는다.
-        if (!session) {
-          if (alive) setStatus('empty')
-          return
-        }
-        const res = await getMyMapAction(session.access_token)
-        if (!alive) return
-        if (!res.ok) {
-          setError(res.error ?? '내 지도를 불러오지 못했어요')
-          setStatus('error')
-          return
-        }
-        setToken(session.access_token)
-        if (!res.map) {
-          setStatus('empty')
-          return
-        }
-        setShareToken(res.map.shareToken)
-        setTitle(res.map.title)
-        setPins(res.map.pins)
-        setStatus('ready')
-      } catch (e) {
-        if (!alive) return
-        setError(e instanceof Error ? e.message : '내 지도를 불러오지 못했어요')
-        setStatus('error')
+  // 내 지도 로드. 종료 상태(ready/empty/error)만 세팅 — 로딩 표시는 호출부에서(초기값=loading).
+  const load = useCallback(async () => {
+    try {
+      const sb = getBrowserSupabase()
+      const {
+        data: { session },
+      } = await sb.auth.getSession()
+      // 익명 세션이 없으면 아직 담은 적 없는 사용자 — 새로 로그인하지 않는다.
+      if (!session) {
+        setStatus('empty')
+        return
       }
-    })()
-    return () => {
-      alive = false
+      const res = await getMyMapAction(session.access_token)
+      if (!res.ok) {
+        setError(res.error ?? '내 지도를 불러오지 못했어요')
+        setStatus('error')
+        return
+      }
+      setToken(session.access_token)
+      if (!res.map) {
+        setStatus('empty')
+        return
+      }
+      setShareToken(res.map.shareToken)
+      setTitle(res.map.title)
+      setPins(res.map.pins)
+      setStatus('ready')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '내 지도를 불러오지 못했어요')
+      setStatus('error')
     }
   }, [])
+
+  useEffect(() => {
+    void (async () => {
+      await load()
+    })()
+  }, [load])
 
   const removePin = useCallback(
     async (pinId: string) => {
@@ -107,7 +107,15 @@ export default function MyMapClient() {
         <p className="text-sm text-destructive" role="alert">
           {error ?? '문제가 생겼어요'}
         </p>
-        <Button type="button" variant="outline" size="sm" onClick={() => window.location.reload()}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setStatus('loading')
+            load()
+          }}
+        >
           다시 시도
         </Button>
       </Centered>
@@ -120,11 +128,14 @@ export default function MyMapClient() {
         <span className="text-4xl">🗺️</span>
         <p className="font-medium">아직 담은 장소가 없어요</p>
         <p className="max-w-xs text-sm text-muted-foreground">
-          인스타 링크로 장소를 찾아 “내 지도에 담기”를 누르면 여기 모여요.
+          “+ 장소 추가”로 직접 담거나, 인스타 링크로 찾아 담아보세요.
         </p>
-        <Link href="/" className={buttonVariants({ size: 'sm', className: 'mt-1' })}>
-          장소 담으러 가기
-        </Link>
+        <div className="mt-1 flex items-center gap-2">
+          <AddPlaceDialog onAdded={() => load()} triggerVariant="default" />
+          <Link href="/" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+            링크로 찾기
+          </Link>
+        </div>
       </Centered>
     )
   }
@@ -145,7 +156,8 @@ export default function MyMapClient() {
     <div className="flex flex-col gap-2">
       <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
       <p className="text-sm text-muted-foreground">담은 장소 {pins.length}곳</p>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <AddPlaceDialog onAdded={() => load()} />
         <Button type="button" variant="outline" size="sm" onClick={copyShareLink}>
           {copied ? '✓ 링크 복사됨' : '공유 링크 복사'}
         </Button>
