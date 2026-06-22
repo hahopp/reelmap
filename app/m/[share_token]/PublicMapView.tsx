@@ -34,6 +34,8 @@ export default function PublicMapView({
     tags: p.tags,
     note: p.note,
     instaCodes: p.instaCodes,
+    placeId: p.placeId,
+    contentId: p.contentId,
   }))
 
   const header = (
@@ -61,6 +63,7 @@ export default function PublicMapView({
       allTags={allTags}
       basePath={`/m/${shareToken}`}
       filtered={selectedTags.length > 0}
+      saveable
     />
   )
 }

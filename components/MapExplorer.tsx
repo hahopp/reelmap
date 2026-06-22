@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import MapView from '@/components/map/MapView'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { InstagramIcon } from '@/components/icons/instagram'
+import SavePlaceButton from '@/components/SavePlaceButton'
 import TagFilter from '@/app/explore/TagFilter'
 
 export type ExplorerItem = {
@@ -17,6 +18,8 @@ export type ExplorerItem = {
   tags: string[]
   note?: string | null
   instaCodes?: string[]
+  placeId?: string // 담기용(공개 지도/탐색)
+  contentId?: string | null // 출처 릴(있으면 담을 때 그 후보에 투표)
 }
 
 /**
@@ -32,6 +35,7 @@ export default function MapExplorer({
   emptyText = '아직 등록된 장소가 없어요.',
   noMatchText = '선택한 태그에 맞는 장소가 없어요.',
   renderItemAction,
+  saveable = false,
 }: {
   header: ReactNode
   items: ExplorerItem[]
@@ -42,6 +46,8 @@ export default function MapExplorer({
   noMatchText?: string
   /** 카드 우상단에 표시할 항목별 액션(예: 제거 버튼). 카드 포커스와 분리(stopPropagation 처리됨). */
   renderItemAction?: (item: ExplorerItem) => ReactNode
+  /** true면 placeId 있는 항목 우상단에 "담기" 버튼 표시(공개 지도/탐색용). renderItemAction 이 우선. */
+  saveable?: boolean
 }) {
   const [focus, setFocus] = useState<{ lat: number; lng: number } | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -88,15 +94,21 @@ export default function MapExplorer({
           </p>
         ) : (
           <ul className="flex flex-col gap-3">
-            {items.map((p, i) => (
+            {items.map((p, i) => {
+              const action = renderItemAction
+                ? renderItemAction(p)
+                : saveable && p.placeId
+                  ? <SavePlaceButton placeId={p.placeId} contentId={p.contentId ?? null} />
+                  : null
+              return (
               <li key={p.id} id={`pin-${p.id}`} className="relative">
-                {renderItemAction && (
+                {action && (
                   <div
                     className="absolute right-2 top-2 z-10"
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}
                   >
-                    {renderItemAction(p)}
+                    {action}
                   </div>
                 )}
                 <Card
@@ -113,7 +125,7 @@ export default function MapExplorer({
                   className={cn(
                     'cursor-pointer transition duration-150 hover:-translate-y-0.5 hover:shadow-md hover:ring-foreground/25',
                     selectedId === p.id && 'ring-2 ring-primary',
-                    renderItemAction && 'pr-10',
+                    action && 'pr-10',
                   )}
                 >
                   <CardHeader>
@@ -162,7 +174,8 @@ export default function MapExplorer({
                   )}
                 </Card>
               </li>
-            ))}
+              )
+            })}
           </ul>
         )}
       </section>

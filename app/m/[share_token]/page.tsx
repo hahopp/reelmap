@@ -40,6 +40,12 @@ export default async function PublicMapPage({
           </span>
           <span className="font-semibold tracking-tight text-foreground">📍 ReelMap</span>
         </Link>
+        <Link
+          href="/my"
+          className="ml-auto text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          📍 내 지도
+        </Link>
       </header>
 
       <PublicMapView

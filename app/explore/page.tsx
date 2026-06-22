@@ -22,6 +22,7 @@ export default async function ExplorePage({
     address: p.address,
     tags: p.tags,
     instaCodes: p.instaCodes,
+    placeId: p.id,
   }))
 
   return (
@@ -38,6 +39,12 @@ export default async function ExplorePage({
           <span className="font-semibold tracking-tight text-foreground">📍 ReelMap</span>
         </Link>
         <span className="text-sm text-muted-foreground">전체 지도</span>
+        <Link
+          href="/my"
+          className="ml-auto text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          📍 내 지도
+        </Link>
       </header>
 
       <MapExplorer
@@ -55,6 +62,7 @@ export default async function ExplorePage({
         basePath="/explore"
         filtered={selected.length > 0}
         emptyText="아직 등록된 장소가 없어요."
+        saveable
       />
     </div>
   )

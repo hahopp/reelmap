@@ -46,6 +46,53 @@ export async function saveCandidateToMyMap(input: {
   return { shareToken }
 }
 
+/**
+ * 공개 지도/탐색에서 "담기" — 이미 등록된 장소를 내 지도에 담는다.
+ * map_pin upsert + (출처 릴 contentId 있으면) 그 후보(submission)에 투표(selection).
+ * @returns 내 지도 share_token (담은 뒤 "내 지도 보기" 링크용)
+ */
+export async function savePlaceToMyMap(input: {
+  accessToken: string
+  placeId: string
+  contentId?: string | null
+}): Promise<SaveResult> {
+  const uid = await verifyUid(input.accessToken)
+  const db = createAdminClient()
+  const appUserId = await ensureAppUser(db, uid)
+  const { mapId, shareToken } = await ensureMyMap(db, appUserId)
+
+  // 담기 (출처 릴이 있으면 함께 기록)
+  const { error: me } = await db
+    .from('map_pin')
+    .upsert(
+      { map_id: mapId, place_id: input.placeId, content_id: input.contentId ?? null },
+      { onConflict: 'map_id,place_id' },
+    )
+  if (me) throw new Error('map_pin: ' + me.message)
+
+  // 출처 릴이 있을 때만, 그 후보(content×place)에 투표
+  if (input.contentId) {
+    const { data: sub, error: se } = await db
+      .from('submission')
+      .select('id')
+      .eq('content_id', input.contentId)
+      .eq('place_id', input.placeId)
+      .maybeSingle()
+    if (se) throw new Error('submission 조회: ' + se.message)
+    if (sub) {
+      const { error: ve } = await db
+        .from('selection')
+        .upsert(
+          { user_id: appUserId, submission_id: sub.id as string },
+          { onConflict: 'user_id,submission_id' },
+        )
+      if (ve) throw new Error('selection: ' + ve.message)
+    }
+  }
+
+  return { shareToken }
+}
+
 /** access_token → 진짜 익명 유저 uid (클라가 보낸 id 불신, 항상 서버 검증) */
 async function verifyUid(accessToken: string): Promise<string> {
   const auth = createAnonClient()
