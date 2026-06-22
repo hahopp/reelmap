@@ -21,6 +21,7 @@ ReelMap = 인스타에서 본 그 장소를 주제별 지도로 모아 공유하
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 코드/시스템 구조·흐름·파일 위치 | 코드 수정 전 | 🟡 반-안정 |
 | [PRD.md](PRD.md) | 제품 기획·데이터모델·신뢰도·지표(스펙) | 제품 의도·모델 확인 | 🟢 안정 |
 | [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) | Phase 0~5 단계·마일스톤·DoD | 큰 그림·다음 단계 설계 | 🟢 안정 |
+| [SETUP_KAKAO_LOGIN.md](SETUP_KAKAO_LOGIN.md) | 카카오 로그인 운영자 설정 런북 | 카카오 로그인 켤 때 | 🟡 반-안정 |
 | [decisions/](decisions/) | 중요한 기술/제품 결정 기록(ADR) | 왜 이렇게 했는지 추적 | 🟢 누적 |
 
 루트 진입점(도구가 자동 인식): [`/CLAUDE.md`](../CLAUDE.md)(AI 규칙) · [`/AGENTS.md`](../AGENTS.md)(Next 16 주의) · [`/README.md`](../README.md)(사람용 개요).

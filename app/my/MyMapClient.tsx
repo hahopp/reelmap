@@ -28,6 +28,7 @@ export default function MyMapClient() {
   const [pins, setPins] = useState<PinRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [isAnonymous, setIsAnonymous] = useState(false)
 
   // 내 지도 로드. 종료 상태(ready/empty/error)만 세팅 — 로딩 표시는 호출부에서(초기값=loading).
   const load = useCallback(async () => {
@@ -36,6 +37,7 @@ export default function MyMapClient() {
       const {
         data: { session },
       } = await sb.auth.getSession()
+      setIsAnonymous(session?.user?.is_anonymous === true)
       // 익명 세션이 없으면 아직 담은 적 없는 사용자 — 새로 로그인하지 않는다.
       if (!session) {
         setStatus('empty')
@@ -167,6 +169,13 @@ export default function MyMapClient() {
           </span>
         )}
       </div>
+      {isAnonymous && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200">
+          💡 이 지도는 지금 이 브라우저에만 저장돼요. 우측 상단{' '}
+          <span className="font-semibold">카카오 로그인</span>을 하면 계정에 안전하게 보관되고 다른
+          기기에서도 볼 수 있어요.
+        </p>
+      )}
     </div>
   )
 

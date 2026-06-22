@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import MyMapClient from './MyMapClient'
+import AuthButton from '@/components/AuthButton'
 
 // 개인 지도 — 검색 비노출
 export const metadata = { robots: { index: false } }
@@ -7,7 +8,7 @@ export const metadata = { robots: { index: false } }
 export default function MyMapPage() {
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
-      <header className="flex shrink-0 items-center border-b bg-card/70 px-4 py-3 backdrop-blur">
+      <header className="flex shrink-0 items-center gap-3 border-b bg-card/70 px-4 py-3 backdrop-blur">
         <Link
           href="/"
           aria-label="홈으로 돌아가기"
@@ -18,6 +19,9 @@ export default function MyMapPage() {
           </span>
           <span className="font-semibold tracking-tight text-foreground">📍 ReelMap</span>
         </Link>
+        <div className="ml-auto">
+          <AuthButton />
+        </div>
       </header>
 
       <MyMapClient />
