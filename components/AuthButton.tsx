@@ -41,7 +41,12 @@ export default function AuthButton() {
       const {
         data: { session },
       } = await sb.auth.getSession()
-      const options = { provider: 'kakao' as const, options: { redirectTo: window.location.href } }
+      // 카카오 이메일(account_email)은 비즈앱 심사가 필요 → Supabase 기본 scope에서 빼고
+      // 닉네임·프로필 사진만 요청(이메일 미사용). 안 그러면 KOE205.
+      const options = {
+        provider: 'kakao' as const,
+        options: { redirectTo: window.location.href, scopes: 'profile_nickname profile_image' },
+      }
       // 익명 세션 → 신원 연결(데이터 유지) / 없으면 일반 로그인
       const { error: e } = session?.user?.is_anonymous
         ? await sb.auth.linkIdentity(options)
