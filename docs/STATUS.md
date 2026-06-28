@@ -3,7 +3,7 @@
 > **역할**: 프로젝트 현재 상태 + 작업한 것 + 작업할 것. **작업 추적의 단일 진실원천.**
 > **대상**: AI 에이전트 · 사람
 > **안정성**: 🔴 변동 — 의미 있는 작업이 끝날 때마다 갱신한다(아래 "갱신 규칙").
-> **최종수정**: 2026-06-22
+> **최종수정**: 2026-06-28
 > **연관**: [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) 단계 상세 · [ARCHITECTURE.md](ARCHITECTURE.md) 코드 구조 · [PRD.md](PRD.md) 기획
 
 한 줄: 인스타에서 본 **그 장소를 주제별 지도로** 모아 공유. 포지셔닝=장소 일반(주제별) / 첫 버티컬·시딩=캠핑.
@@ -13,7 +13,7 @@
 ## 1. 한눈에
 
 - **라이브**: https://reelmap-teal.vercel.app (Vercel 프로덕션, `hahao/reelmap`)
-- **운영 게이트**: Vercel 배포 ✅ · 카카오 도메인 등록 ✅ · Supabase 익명 로그인 ✅
+- **운영 게이트**: Vercel 배포 ✅ · 카카오 도메인 등록 ✅ · Supabase 익명 로그인 ✅ · **카카오 소셜 로그인 운영 설정 완료 + 프로덕션 로그인 동작 검증** ✅(2026-06-28)
 - **동작하는 핵심**: 소비자 핵심 루프(M2) — 인스타 링크 → 후보 조회 → 내 지도에 담기 → **내 지도(`/my`) 보기·핀 제거·장소 직접 추가·공유**. 추가로 **공개 지도(`/m`)·탐색(`/explore`)에서 바로 담기**(발견→재사용 루프). 모두 배포 URL에서 end-to-end. **Phase 2 DoD 충족.**
 - **운영자 인제스트 배포됨(ADR 0002)**: 포착 → 검토·확정(수동) → 장소·편성 → 확정 즉시 `/explore` 공개. (AI 정제는 UI 미노출, 나중 재개)
 - **품질**: `npm test` 16/16 · `tsc --noEmit` · `npm run build` · `eslint` 모두 green · git `main` = 프로덕션 동기화
@@ -25,7 +25,7 @@
 | 0 인프라 | ~100% | 배포·DB·키 완료. PostHog 키만 Phase 5 |
 | 1 데이터·백엔드 | ~90% | 9테이블·RLS·dedup·인스타정규화·신뢰도 라벨·투표집계 완료 |
 | **2 핵심 루프(M2)** | ~90% | 읽기+쓰기(담기)+내 지도 관리(뷰·핀 제거·장소 직접 추가·공유) ✅ / 새 장소 추가 고도화(URL/지도클릭·/find 무후보 진입) 남음 |
-| 3 인증·내 지도 | ~35% | 익명 인증 + **카카오 로그인·익명→영구 계정 승격 코드** ✅(운영자 Supabase/카카오 설정 대기) / 다중지도·"어느 지도에 담을지"·RLS 본인쓰기 남음 |
+| 3 인증·내 지도 | ~70% | 익명 인증 + **카카오 로그인·승격 검증 완료** ✅ + **다중 지도 + "어느 지도에 담을지" 선택** ✅(2026-06-28, 코드·로컬검증 green / 배포·prod검증 대기) / RLS 본인쓰기 남음 |
 | 4 공유·시드·신고 | ~70% | 공유·시드·공개뷰·담기(공개 지도/탐색에서 직접) ✅ / 신고 UI·OG 남음 |
 | 5 계측·출시 | ~25% | PostHog·OG·베타 남음 |
 
@@ -43,18 +43,20 @@
   - **내 지도 관리(증분 4)** — `/my`(noindex, 익명 세션 기반): 담은 핀 모아보기(`MapExplorer` 재사용) + **핀 제거**(소유권 검증 + 투표 회수로 유령표 방지) + 공유 링크 복사. 빈/로딩/에러 상태. 홈·담기 후 진입 링크 `/my`. (`lib/consumer.ts` `getMyMapWithPins`/`removePinFromMyMap` · `app/my/*` · `components/RemovePinButton`)
   - **장소 직접 추가(증분 3 일부)** — `/my`의 "+ 장소 추가" → 작은 다이얼로그(이름 검색→선택)로 내 지도에 바로 담기. 익명 세션 자동 생성. **릴 없는 개인 핀**(`content_id` 없음, `submission`/`selection` 안 만듦 — 크라우드 후보와 분리). (`lib/consumer.ts addPlaceToMyMap` + `ensureAppUser`/`ensureMyMap` 추출 · `app/my/actions.ts searchPlacesAction`/`addPlaceAction` · `components/AddPlaceDialog` · `components/ui/dialog`)
   - **공개 지도/탐색에서 담기** — `/m`·`/explore` 카드 우상단 `SavePlaceButton`(+→✓) → `savePlaceToMyMap`(map_pin + 출처 릴 있으면 그 후보 투표). `MapExplorer saveable`. (발견→재사용 루프)
-- **카카오 로그인·계정 승격(Phase 3 코드)**: `components/AuthButton`(`/my` 헤더) — 익명 세션이면 `linkIdentity`로 **같은 uid에 카카오 신원 연결 → 데이터 그대로 영구 계정 승격**(다기기·alias 자동 해결), 세션 없으면 `signInWithOAuth`. `onAuthStateChange`로 상태 반응. 서버 로직 무변경(app_user를 auth uid로 키잉). 익명 사용자엔 `/my`에 로그인 유도 힌트. **동작은 운영자 설정 필요 → [SETUP_KAKAO_LOGIN.md](SETUP_KAKAO_LOGIN.md).**
+- **카카오 로그인·계정 승격(Phase 3 코드)**: `components/AuthButton`(`/my` 헤더) — 익명 세션이면 `linkIdentity`로 **같은 uid에 카카오 신원 연결 → 데이터 그대로 영구 계정 승격**(다기기·alias 자동 해결), 세션 없으면 `signInWithOAuth`. `onAuthStateChange`로 상태 반응. 서버 로직 무변경(app_user를 auth uid로 키잉). 익명 사용자엔 `/my`에 로그인 유도 힌트. **운영 설정 완료 + 프로덕션 동작 검증됨**(2026-06-28): 카카오 인증→영구 계정(`is_anonymous:false`, `provider:kakao`)·익명 때 담은 핀 보존·재접속 세션 복원 확인. 설정 런북 = [SETUP_KAKAO_LOGIN.md](SETUP_KAKAO_LOGIN.md). (설정 중 만난 함정: Supabase **Site URL**을 프로덕션으로 안 바꾸면 로그인이 localhost로 튕김 → 런북 §4.)
+- **다중 지도 + 담을 지도 선택(Phase 3 증분, 코드·로컬 green / prod검증 대기)**: `/my`가 단일 지도 → **여러 지도 전환(칩)** + 생성·이름수정·삭제(마지막1개 가드). 담기 3경로 모두 **스마트 선택** — 지도 ≤1개면 기존처럼 원탭, ≥2개면 `MapPicker` 다이얼로그("어디에 담을까요?" + "새 지도에 담기"). `map` 테이블 그대로(마이그레이션 0, owner당 N개 이미 지원). 담은 뒤 `/my?map=<id>` 딥링크. 신규: `MapPicker`/`MapNameDialog` · 데이터층 `listMyMaps`/`createMyMap`/`renameMyMap`/`deleteMyMap`/`resolveTargetMap`(소유권 검증) · 담기·추가 액션에 `mapId` 옵션
 - **코어 lib**: 인스타 정규화(16테스트) · 카카오 검색 어댑터 · kakao-url 파서 · tags 파서 · 신뢰도 라벨 · 공개 후보 조회(anon+RLS) · 담기 쓰기(토큰 검증)
 - **운영자 인제스트 파이프라인(ADR 0002 · 배포됨)**: ①포착 `/admin/capture`(URL+답장 raw, 펼침·등록일시) → ②검토·확정 `/admin/review`(카드 직접 입력 — 위치 3종[이름검색/카카오URL/지도클릭]·원문·특징·태그·인스타링크 수정/열기·다중장소 → `registerSeedPlace` 지도 비의존) → ③편성 `/admin/places`(인라인 편집·태그필터·일괄 담기/삭제·전체선택). 스테이징 `instagram_capture`+`place.description`+`place_tag`(빈 어휘). 주제 일반(category/type_key nullable). 어드민 공통 탭 네비. 공용 `LocationPicker`·`MapExplorer`로 입력/공개 UX 통일.
   - **AI 정제는 UI에서 제거(나중 재개)** — 코드는 `lib/refine.ts`(Claude)·`/api/captures`(Bearer)에 dormant. 현재 경로 = 수동 입력.
 
 ## 4. 🔜 작업할 것 (Todo, 우선순위순)
 
-> **▶ 다음 세션 시작점**(2026-06-22 기준): ⏳ **먼저 운영자(사용자)가 카카오 로그인 설정** — [SETUP_KAKAO_LOGIN.md](SETUP_KAKAO_LOGIN.md)(이게 끝나야 `/my`의 카카오 로그인 버튼이 동작·검증 가능). 코드는 배포됨(`7c89ac9`). · 다음 **코드** 작업 후보: ① Phase 3 다음 증분 = **다중 지도 + "어느 지도에 담을지" 선택**(아래 B) / ② **시드 콘텐츠 채우기**(여전한 숙제, 직접 작업, 아래 D) / ③ 공유 미리보기(OG)·신고(아래 C). · 2축 태깅은 [ADR 0003](decisions/0003-tag-model-two-axis.md)(보류).
+> **▶ 다음 세션 시작점**(2026-06-28 기준): ✅ 카카오 로그인 검증 완료 + ✅ **다중 지도 + 담을 지도 선택** 코드 완료(로컬 green) — **배포 후 prod에서 동작 검증** 필요(지도 생성·전환·담기 선택·딥링크). 다음 **코드** 작업 후보: ① **시드 콘텐츠 채우기**(직접 작업, 아래 D) / ② 공유 미리보기(OG)·신고(아래 C) / ③ RLS 본인-쓰기 정책(아래 B). · (미루기로 결정) 장소 외부 참고 링크 = `place_link` 별도 테이블(블로그 입력 만들 때). · 2축 태깅은 [ADR 0003](decisions/0003-tag-model-two-axis.md)(보류).
 
 ### ★ 인제스트 파이프라인 후속
 - [ ] **AI 정제 재개**(원하면): Vercel env(`ANTHROPIC_API_KEY`·`INGEST_API_TOKEN`) + `/admin/review`에 AI 버튼 복원(코드 dormant) + 정제 배치 트리거
 - [ ] **2축 태깅(유형/속성)** 도입 검토 — 상세 [ADR 0003](decisions/0003-tag-model-two-axis.md): `place_tag.category='type'` 통제 어휘 + 제안→승격. 현재는 태그 자유·`place_tag` 빈 상태(보류)
+- [ ] **장소 외부 참고 링크(네이버 블로그·유튜브 등) N개** — 구조 점검 완료(2026-06-28): place↔인스타 N:N은 이미 `submission`으로 지원. 블로그는 `submission`(투표/신뢰도) 재사용 대신 **전용 `place_link` 테이블**(`place_id` FK·`platform`·`url`·`title`·`unique(place_id,url)`)로 분리해 추가하기로 결정. 순수 추가라 기존 스키마 무변경 → **실제 블로그 입력/표시를 만들 때 같이 생성**(지금 만들면 생산자·소비자 없는 죽은 스키마라 보류)
 - [ ] 다중 장소 캡처의 **장소별 개별 확정**(현재 캡처 단위 일괄)
 - [ ] **공개 노출 정책**: 확정 = 즉시 `/explore` 공개 — 필요 시 "발행" 게이트 추가 검토
 - [ ] 장소 목록 **페이지네이션**(현재 무제한 — Supabase 1000행 상한)
@@ -64,9 +66,9 @@
 - [x] **증분 4 · 내 지도 뷰/관리**: `/my`에서 담은 핀 모아보기(`MapExplorer` 재사용) + 핀 제거(투표 회수) + 공유 ✅(2026-06-22)
 
 ### B. Phase 3 · 인증 & 내 지도
-- [~] 카카오 소셜 로그인(Supabase Auth) — 코드 ✅(`AuthButton`), **운영자 설정 대기**([SETUP_KAKAO_LOGIN.md](SETUP_KAKAO_LOGIN.md)). 구글은 나중
+- [x] 카카오 소셜 로그인(Supabase Auth) — 코드 ✅(`AuthButton`) + **운영 설정 완료·프로덕션 동작 검증** ✅(2026-06-28, [SETUP_KAKAO_LOGIN.md](SETUP_KAKAO_LOGIN.md)). 구글은 나중
 - [x] 익명→영구 계정 link(담은 데이터 그대로 승격) — `linkIdentity` ✅(2026-06-22, 설정되면 동작)
-- [ ] 내 지도 여러 개 관리 + "어느 지도에 담을지" 선택
+- [x] 내 지도 여러 개 관리 + "어느 지도에 담을지" 선택 ✅(2026-06-28, 코드·로컬 green / prod검증 대기) — `/my` 지도 전환 칩·생성·이름수정·삭제(마지막1개 가드) + 담기 시 **스마트 선택**(지도 ≤1개=원탭, ≥2개=지도 선택 다이얼로그 `MapPicker`, "새 지도에 담기" 포함). `map` 테이블 그대로(마이그레이션 0). 담은 뒤 `/my?map=<id>` 딥링크. 데이터층 `listMyMaps`/`createMyMap`/`renameMyMap`/`deleteMyMap`/`resolveTargetMap`, 담기 3경로(`saveCandidate`/`savePlace`/`addPlace`) 모두 `mapId` 옵션
 - [ ] RLS 본인-쓰기 정책(현재 모든 쓰기 service_role)
 
 ### C. Phase 4 나머지 · 데이터 품질/공유
@@ -93,7 +95,7 @@
 
 - ✅ 카카오 Developers Web 플랫폼에 `https://reelmap-teal.vercel.app` 도메인 등록(지도 렌더)
 - ✅ Supabase Authentication → Anonymous sign-ins 활성화(M2 담기)
-- ⏳ **(카카오 로그인)** 카카오 Developers 카카오 로그인 활성화 + Supabase Kakao 제공자/Redirect URLs/Manual Linking — 상세 순서 [SETUP_KAKAO_LOGIN.md](SETUP_KAKAO_LOGIN.md). **이게 끝나야 "카카오 로그인" 버튼이 동작.**
+- ✅ **(카카오 로그인)** 카카오 Developers 카카오 로그인 활성화 + Supabase Kakao 제공자/Site URL/Redirect URLs/Manual Linking — 완료(2026-06-28). 프로덕션 로그인 동작 검증됨. 런북 [SETUP_KAKAO_LOGIN.md](SETUP_KAKAO_LOGIN.md). (함정: Site URL 기본값 localhost → 프로덕션 주소로 변경 필요)
 - ✅ **(인제스트)** `0004_ingest_pipeline.sql` Supabase 적용 완료
 - ⏳ **(인제스트·선택)** AI 정제 재개 시에만: Vercel env `ANTHROPIC_API_KEY`·`INGEST_API_TOKEN` 추가 (현재 AI는 UI 미노출이라 불필요)
 - ⏳ (Phase 5) PostHog 프로젝트 키 → Vercel env (`NEXT_PUBLIC_POSTHOG_KEY`)

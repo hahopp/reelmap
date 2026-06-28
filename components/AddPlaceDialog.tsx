@@ -21,11 +21,14 @@ import { Input } from '@/components/ui/input'
  */
 export default function AddPlaceDialog({
   onAdded,
+  mapId,
   triggerLabel = '+ 장소 추가',
   triggerVariant = 'outline',
   triggerClassName,
 }: {
   onAdded: () => void
+  /** 담을 지도. 미지정 시 기본 지도. */
+  mapId?: string
   triggerLabel?: string
   triggerVariant?: 'outline' | 'default'
   triggerClassName?: string
@@ -81,7 +84,7 @@ export default function AddPlaceDialog({
       }
       if (!session) throw new Error('세션 생성 실패')
 
-      const res = await addPlaceAction({ accessToken: session.access_token, place: r })
+      const res = await addPlaceAction({ accessToken: session.access_token, place: r, mapId })
       if (!res.ok) throw new Error(res.error ?? '추가 실패')
 
       onAdded()

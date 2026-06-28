@@ -3,7 +3,7 @@
 > **역할**: 카카오 소셜 로그인 + 익명→영구 계정 승격을 **실제 동작**시키기 위한 운영자 수동 설정 순서.
 > **대상**: 사람(운영자) · AI 에이전트(현황 파악)
 > **안정성**: 🟡 반-안정 — Supabase/카카오 대시보드 UI가 바뀌면 갱신.
-> **최종수정**: 2026-06-22
+> **최종수정**: 2026-06-28 (운영 설정 완료 + 프로덕션 로그인 동작 검증됨)
 > **연관**: [STATUS.md](STATUS.md) §6 운영자 작업 · [ARCHITECTURE.md](ARCHITECTURE.md) 인증 흐름 · [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) Phase 3
 
 코드(`components/AuthButton.tsx` 등)는 배포돼 있지만, **아래 설정이 끝나야** "카카오 로그인" 버튼이 실제로 작동한다. 설정 전에는 버튼을 눌러도 "provider is not enabled" 류 에러가 난다.
@@ -34,7 +34,7 @@
    - **Client Secret** = 카카오 **Client Secret 코드**(1-5).
    - 여기 표시되는 Callback URL이 1-3에서 등록한 값과 같은지 확인.
 2. **Authentication → URL Configuration**
-   - **Site URL** = `https://reelmap-teal.vercel.app`
+   - **Site URL** = `https://reelmap-teal.vercel.app` — ⚠️ **기본값이 `http://localhost:3000`이라 반드시 바꿔야 한다.** 안 바꾸면 배포 사이트 로그인이 localhost로 튕긴다(§4 참고).
    - **Redirect URLs**(허용 목록)에 추가 — 둘 다 꼭:
      - `https://reelmap-teal.vercel.app/**`
      - `http://localhost:3000/**`
@@ -54,5 +54,6 @@
 
 - **"provider is not enabled"** → 2-1 누락.
 - **로그인 후 빈 화면/`redirect not allowed`** → 2-2 Redirect URLs 누락.
+- **로그인 후 `localhost:3000`으로 튕김**(배포 사이트에서 로그인했는데 로컬로 복귀) → 2-2 **Site URL이 기본값 `http://localhost:3000`로 남아 있음**. Site URL을 `https://reelmap-teal.vercel.app`로 변경. (redirect_to가 허용목록과 매칭 안 되면 Supabase가 Site URL로 폴백하는데, 그 기본값이 localhost라 발생. Redirect URLs만 추가하고 Site URL을 안 바꾸면 이 증상이 난다. 2026-06-28 실제 발생·해결.)
 - **승격이 안 되고 새 계정으로 로그인됨** → 2-3 Manual Linking 비활성 또는, 그 카카오 계정이 **이미 다른 uid에 연결**됨(이 경우 익명 데이터는 합쳐지지 않음 — 의도된 한계, MVP).
-- **닉네임이 "내 계정"으로 표시** → 1-4 동의항목(닉네임) 미설정.
+- **닉네임이 "내 계정"으로 표시** → 1-4 동의항목(닉네임) 미설정. 동의항목을 켠 뒤에는 **다시 로그인**해야 닉네임이 세션에 반영됨(기존 세션엔 소급 적용 안 됨).
