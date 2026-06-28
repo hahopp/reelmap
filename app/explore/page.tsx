@@ -1,8 +1,13 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { listExplorePlaces, listAllTags } from '@/lib/places-explore'
 import MapExplorer, { type ExplorerItem } from '@/components/MapExplorer'
 
-export const metadata = { title: '전체 지도 · ReelMap', robots: { index: false } }
+export const metadata: Metadata = {
+  title: '전체 지도', // 루트 템플릿이 " · ReelMap"을 붙임
+  robots: { index: false },
+  openGraph: { title: '전체 장소 지도 · ReelMap', description: 'ReelMap에 모인 장소를 한 지도에서.' },
+}
 
 export default async function ExplorePage({
   searchParams,

@@ -1,4 +1,5 @@
 import 'server-only'
+import { cache } from 'react'
 import { createAnonClient } from './supabase/server'
 import { instaCodesByPlace } from './insta-codes'
 import type { PinRow } from './pins'
@@ -11,8 +12,11 @@ export interface PublicMap {
   coverImageUrl: string | null
 }
 
-/** 공유 토큰으로 공개 지도 조회. RLS가 시드/링크공유만 통과(비공개는 null). */
-export async function getPublicMap(shareToken: string): Promise<PublicMap | null> {
+/**
+ * 공유 토큰으로 공개 지도 조회. RLS가 시드/링크공유만 통과(비공개는 null).
+ * cache()로 감싸 같은 요청 내 generateMetadata·페이지 호출이 한 번만 조회되게 한다.
+ */
+export const getPublicMap = cache(async (shareToken: string): Promise<PublicMap | null> => {
   const db = createAnonClient()
   const { data, error } = await db
     .from('map')
@@ -28,6 +32,17 @@ export async function getPublicMap(shareToken: string): Promise<PublicMap | null
     isSeed: data.is_seed as boolean,
     coverImageUrl: (data.cover_image_url as string | null) ?? null,
   }
+})
+
+/** 공개 지도의 핀 수(가벼운 head 카운트) — OG 설명/메타용. */
+export async function countPublicMapPins(mapId: string): Promise<number> {
+  const db = createAnonClient()
+  const { count, error } = await db
+    .from('map_pin')
+    .select('id', { count: 'exact', head: true })
+    .eq('map_id', mapId)
+  if (error) throw new Error(error.message)
+  return count ?? 0
 }
 
 export interface SeedMapSummary {
