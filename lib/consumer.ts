@@ -507,9 +507,13 @@ export async function getMyMapsWithPins(accessToken: string): Promise<MyMapDetai
     lat: number
     lng: number
     tags: string[] | null
+    created_by: string | null
   }
   const [placesRes, codesByPlace] = await Promise.all([
-    db.from('place').select('id, name, road_address, address, lat, lng, tags').in('id', placeIds),
+    db
+      .from('place')
+      .select('id, name, road_address, address, lat, lng, tags, created_by')
+      .in('id', placeIds),
     instaCodesByPlace(db, placeIds),
   ])
   if (placesRes.error) throw new Error('place 조회: ' + placesRes.error.message)
@@ -531,6 +535,7 @@ export async function getMyMapsWithPins(accessToken: string): Promise<MyMapDetai
       instaCodes: codesByPlace.get(p.place_id as string) ?? [],
       contentId: (p.content_id as string | null) ?? null,
       note: (p.note as string | null) ?? null,
+      editable: pl?.created_by != null && pl.created_by === appUserId,
     }
     const arr = pinsByMap.get(p.map_id as string) ?? []
     arr.push(row)
@@ -597,4 +602,121 @@ export async function removePinFromMyMap(accessToken: string, pinId: string): Pr
       if (e6) throw new Error('selection 삭제: ' + e6.message)
     }
   }
+}
+
+/** 핀이 내 지도의 것인지 검증(메모는 핀 단위라 지도 소유만 보면 됨). */
+async function assertPinOwner(db: SupabaseClient, pinId: string, appUserId: string): Promise<void> {
+  const { data: pin, error } = await db
+    .from('map_pin')
+    .select('map_id')
+    .eq('id', pinId)
+    .maybeSingle()
+  if (error) throw new Error('핀 조회: ' + error.message)
+  if (!pin) throw new Error('핀을 찾을 수 없습니다')
+  await assertMapOwner(db, pin.map_id as string, appUserId)
+}
+
+/** 장소를 내가 만들었는지 검증(공유 카탈로그라 태그·릴 편집은 created_by=나 일 때만). */
+async function assertPlaceCreator(
+  db: SupabaseClient,
+  placeId: string,
+  appUserId: string,
+): Promise<void> {
+  const { data: pl, error } = await db
+    .from('place')
+    .select('created_by')
+    .eq('id', placeId)
+    .maybeSingle()
+  if (error) throw new Error('place 조회: ' + error.message)
+  if (!pl || (pl.created_by as string | null) !== appUserId) {
+    throw new Error('내가 만든 장소만 수정할 수 있어요')
+  }
+}
+
+/** 핀 메모 수정(핀 단위, 나만) — 내 지도의 핀이면 누구나 자기 메모를 단다. */
+export async function updatePinNote(
+  accessToken: string,
+  pinId: string,
+  note: string,
+): Promise<void> {
+  const uid = await verifyUid(accessToken)
+  const db = createAdminClient()
+  const appUserId = await findAppUserId(db, uid)
+  if (!appUserId) throw new Error('내 지도를 찾을 수 없습니다')
+  await assertPinOwner(db, pinId, appUserId)
+  const { error } = await db
+    .from('map_pin')
+    .update({ note: note.trim() || null })
+    .eq('id', pinId)
+  if (error) throw new Error('메모 저장: ' + error.message)
+}
+
+/** 내가 만든 장소의 태그 교체(공유 카탈로그 — created_by=나 일 때만). */
+export async function updateMyPlaceTags(
+  accessToken: string,
+  placeId: string,
+  tags: string[],
+): Promise<void> {
+  const uid = await verifyUid(accessToken)
+  const db = createAdminClient()
+  const appUserId = await findAppUserId(db, uid)
+  if (!appUserId) throw new Error('내 지도를 찾을 수 없습니다')
+  await assertPlaceCreator(db, placeId, appUserId)
+  const { error } = await db.from('place').update({ tags }).eq('id', placeId)
+  if (error) throw new Error('태그 저장: ' + error.message)
+}
+
+/** 내가 만든 장소에 릴(인스타) 링크 추가 — content + submission(source='user'). @returns postId */
+export async function addMyPlaceReel(
+  accessToken: string,
+  placeId: string,
+  instagramUrl: string,
+): Promise<string> {
+  const norm = normalizeInstagramUrl(instagramUrl)
+  if (!norm) throw new Error('유효한 인스타그램 링크가 아닙니다')
+  const uid = await verifyUid(accessToken)
+  const db = createAdminClient()
+  const appUserId = await findAppUserId(db, uid)
+  if (!appUserId) throw new Error('내 지도를 찾을 수 없습니다')
+  await assertPlaceCreator(db, placeId, appUserId)
+
+  const { error: ce } = await db
+    .from('content')
+    .upsert(
+      { id: norm.postId, source_url: norm.canonicalUrl, platform: 'instagram' },
+      { onConflict: 'id' },
+    )
+  if (ce) throw new Error('content: ' + ce.message)
+
+  const { error: se } = await db.from('submission').upsert(
+    {
+      content_id: norm.postId,
+      place_id: placeId,
+      submitted_by: appUserId,
+      source: 'user',
+      status: 'active',
+    },
+    { onConflict: 'content_id,place_id' },
+  )
+  if (se) throw new Error('릴 추가: ' + se.message)
+  return norm.postId
+}
+
+/** 내가 만든 장소에서 릴 링크 제거 — submission 삭제(투표 selection은 FK cascade). */
+export async function removeMyPlaceReel(
+  accessToken: string,
+  placeId: string,
+  postId: string,
+): Promise<void> {
+  const uid = await verifyUid(accessToken)
+  const db = createAdminClient()
+  const appUserId = await findAppUserId(db, uid)
+  if (!appUserId) throw new Error('내 지도를 찾을 수 없습니다')
+  await assertPlaceCreator(db, placeId, appUserId)
+  const { error } = await db
+    .from('submission')
+    .delete()
+    .eq('content_id', postId)
+    .eq('place_id', placeId)
+  if (error) throw new Error('릴 제거: ' + error.message)
 }

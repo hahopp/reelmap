@@ -12,6 +12,7 @@ import {
 } from './actions'
 import MapExplorer, { type ExplorerItem } from '@/components/MapExplorer'
 import RemovePinButton from '@/components/RemovePinButton'
+import EditPlaceDialog from '@/components/EditPlaceDialog'
 import AddPlaceDialog from '@/components/AddPlaceDialog'
 import MapNameDialog from '@/components/MapNameDialog'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -38,6 +39,7 @@ function pushFilterUrl(mapId: string | null) {
 function toItem(p: PinRow): ExplorerItem {
   return {
     id: p.pinId,
+    placeId: p.placeId,
     name: p.name,
     lat: p.lat,
     lng: p.lng,
@@ -46,6 +48,7 @@ function toItem(p: PinRow): ExplorerItem {
     tags: p.tags,
     note: p.note,
     instaCodes: p.instaCodes,
+    editable: p.editable ?? false,
   }
 }
 
@@ -267,8 +270,8 @@ export default function MyMapClient() {
 
   const header = (
     <div className="flex flex-col gap-3">
-      {/* 전체 + 지도 필터 칩 */}
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+      {/* 전체 + 지도 필터 칩 (줄바꿈 — 가로 스크롤 없이) */}
+      <div className="flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => selectFilter(null)}
@@ -419,7 +422,26 @@ export default function MyMapClient() {
             : '이 지도엔 아직 담은 장소가 없어요. “+ 장소 추가”로 담아보세요.'
         }
         renderItemAction={
-          isAll ? undefined : (item) => <RemovePinButton onRemove={() => removePin(item.id)} />
+          isAll
+            ? undefined
+            : (item) => (
+                <div className="flex flex-col items-end gap-1">
+                  {token && (
+                    <EditPlaceDialog
+                      pinId={item.id}
+                      placeId={item.placeId ?? ''}
+                      name={item.name}
+                      editable={item.editable ?? false}
+                      note={item.note ?? null}
+                      tags={item.tags}
+                      instaCodes={item.instaCodes ?? []}
+                      accessToken={token}
+                      onSaved={() => load(selectedId)}
+                    />
+                  )}
+                  <RemovePinButton onRemove={() => removePin(item.id)} />
+                </div>
+              )
         }
       />
       <MapNameDialog

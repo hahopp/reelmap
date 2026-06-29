@@ -17,6 +17,8 @@ export interface PinRow {
   instaCodes: string[]
   contentId: string | null
   note: string | null
+  /** 이 장소를 내가 만들었나(place.created_by=나) → 태그·릴 링크 편집 가능. 미설정 시 불가. */
+  editable?: boolean
 }
 
 /** 지도에 담긴 핀 목록 (place 정보 조인) */

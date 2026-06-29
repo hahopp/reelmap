@@ -8,6 +8,10 @@ import {
   createMyMap,
   renameMyMap,
   deleteMyMap,
+  updatePinNote,
+  updateMyPlaceTags,
+  addMyPlaceReel,
+  removeMyPlaceReel,
   type MyMapDetail,
   type MapSummary,
 } from '@/lib/consumer'
@@ -173,5 +177,74 @@ export async function addPlaceAction(input: {
     return { ok: true }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : '추가에 실패했어요' }
+  }
+}
+
+export interface EditResult {
+  ok: boolean
+  error?: string
+}
+
+/** 핀 메모 수정(나만, 핀 단위). */
+export async function updatePinNoteAction(input: {
+  accessToken: string
+  pinId: string
+  note: string
+}): Promise<EditResult> {
+  try {
+    if (!input?.accessToken || !input?.pinId) return { ok: false, error: '잘못된 요청입니다' }
+    await updatePinNote(input.accessToken, input.pinId, input.note ?? '')
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : '메모 저장에 실패했어요' }
+  }
+}
+
+/** 내가 만든 장소의 태그 교체. */
+export async function updatePlaceTagsAction(input: {
+  accessToken: string
+  placeId: string
+  tags: string[]
+}): Promise<EditResult> {
+  try {
+    if (!input?.accessToken || !input?.placeId) return { ok: false, error: '잘못된 요청입니다' }
+    await updateMyPlaceTags(input.accessToken, input.placeId, input.tags ?? [])
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : '태그 저장에 실패했어요' }
+  }
+}
+
+/** 내가 만든 장소에 릴 링크 추가. */
+export async function addPlaceReelAction(input: {
+  accessToken: string
+  placeId: string
+  instagramUrl: string
+}): Promise<EditResult & { postId?: string }> {
+  try {
+    if (!input?.accessToken || !input?.placeId || !input?.instagramUrl?.trim()) {
+      return { ok: false, error: '잘못된 요청입니다' }
+    }
+    const postId = await addMyPlaceReel(input.accessToken, input.placeId, input.instagramUrl)
+    return { ok: true, postId }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : '릴 추가에 실패했어요' }
+  }
+}
+
+/** 내가 만든 장소에서 릴 링크 제거. */
+export async function removePlaceReelAction(input: {
+  accessToken: string
+  placeId: string
+  postId: string
+}): Promise<EditResult> {
+  try {
+    if (!input?.accessToken || !input?.placeId || !input?.postId) {
+      return { ok: false, error: '잘못된 요청입니다' }
+    }
+    await removeMyPlaceReel(input.accessToken, input.placeId, input.postId)
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : '릴 제거에 실패했어요' }
   }
 }

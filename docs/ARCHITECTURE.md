@@ -59,7 +59,7 @@ lib/                          # 도메인 로직 (대부분 'server-only')
   ingest-auth.ts              # capture API Bearer(INGEST_API_TOKEN) 검증
   public-maps.ts              # 공개 지도/시드맵 읽기(anon+RLS)
   public-lookup.ts            # 소비자 후보 조회(anon+RLS)
-  consumer.ts                 # 소비자 담기 쓰기 + 내 지도 조회/핀 제거(토큰 검증 + service_role). saveCandidate/savePlace·addPlaceToMyMap(개인핀)·addPlaceFromReel(릴 연결 후보 source='user')·upsertPlaceDedup(공용)·listMyMaps(목록·카운트, 피커용)·getMyMapsWithPins(전 지도+핀+설명 1회 → 전체보기·필터)·create/renameMyMap(설명 포함)
+  consumer.ts                 # 소비자 담기 쓰기 + 내 지도 조회/핀 제거(토큰 검증 + service_role). saveCandidate/savePlace·addPlaceToMyMap(개인핀)·addPlaceFromReel(릴 연결 후보 source='user')·upsertPlaceDedup(공용)·listMyMaps(목록·카운트, 피커용)·getMyMapsWithPins(전 지도+핀+설명+editable 1회)·create/renameMyMap(설명)·편집(updatePinNote·updateMyPlaceTags·addMyPlaceReel·removeMyPlaceReel, assertPinOwner/assertPlaceCreator 게이트)
   places-explore.ts           # /explore 장소·태그 목록
   admin/auth.ts               # HMAC 세션 쿠키
   utils.ts                    # cn()
@@ -74,6 +74,7 @@ components/
   RemovePinButton.tsx         # 내 지도 핀 제거(2단계 확인)
   AddPlaceDialog.tsx          # 내 지도 장소 추가 다이얼로그(LocationPicker 3종→이름 확인→개인 핀)
   AddPlaceFromReel.tsx        # /find 무후보 시 직접 추가(LocationPicker→릴 연결 후보, MapPicker 재사용)
+  EditPlaceDialog.tsx         # 내 지도 장소 편집(메모 항상 + created_by=나면 태그·릴 링크). 카드 ✎
   AuthButton.tsx              # 카카오 로그인/로그아웃(익명=linkIdentity 승격, onAuthStateChange)
   icons/instagram.tsx · ui/   # 아이콘 · shadcn 프리미티브(button·input·dialog·tabs…)
 

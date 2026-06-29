@@ -18,9 +18,10 @@ export type ExplorerItem = {
   tags: string[]
   note?: string | null
   instaCodes?: string[]
-  placeId?: string // 담기용(공개 지도/탐색)
+  placeId?: string // 담기용(공개 지도/탐색) · 편집용(내 지도)
   contentId?: string | null // 출처 릴(있으면 담을 때 그 후보에 투표)
   mapNames?: string[] // 소속 지도명(내 지도 "전체 보기"에서 어느 지도의 장소인지)
+  editable?: boolean // 내가 만든 장소(태그·릴 편집 가능, 내 지도 편집용)
 }
 
 /**
