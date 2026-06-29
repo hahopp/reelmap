@@ -136,7 +136,7 @@ export default function AddPlaceDialog({
         <DialogHeader>
           <DialogTitle>장소 추가</DialogTitle>
           <DialogDescription>
-            본 릴/게시물 링크를 먼저 넣고(선택), 위치를 골라 내 지도에 담아요.
+            위치를 골라 내 지도에 담아요. 본 릴/게시물 링크가 있으면 먼저 넣어주세요 — 없어도 괜찮아요.
           </DialogDescription>
         </DialogHeader>
 
@@ -185,9 +185,13 @@ export default function AddPlaceDialog({
               📍 {picked.roadAddress || picked.address || '주소 정보 없음'} ({picked.lat.toFixed(4)},{' '}
               {picked.lng.toFixed(4)})
             </p>
-            {linkNorm && (
+            {linkNorm ? (
               <p className="text-xs font-medium text-emerald-700">
                 ✓ 릴 연결됨 — 다른 사람도 이 릴로 이 장소를 찾을 수 있어요
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                🔒 내 지도에만 담겨요. 위에 릴 링크를 넣으면 다른 사람도 찾을 수 있어요.
               </p>
             )}
             <div className="flex items-center gap-2">
