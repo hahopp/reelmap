@@ -2,7 +2,8 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAnonClient, createAdminClient } from './supabase/server'
 import { coord2address } from './places'
-import { listMapPins, type PinRow } from './pins'
+import { type PinRow } from './pins'
+import { instaCodesByPlace } from './insta-codes'
 import { normalizeInstagramUrl } from './instagram'
 import type { NormalizedPlace } from './places/types'
 
@@ -221,8 +222,12 @@ export async function listMyMaps(accessToken: string): Promise<MapSummary[]> {
   }))
 }
 
-/** 새 지도 만들기 — app_user 보장 후 빈 지도 생성. @returns 생성된 지도 요약. */
-export async function createMyMap(accessToken: string, title: string): Promise<MapSummary> {
+/** 새 지도 만들기 — app_user 보장 후 빈 지도 생성(설명 선택). @returns 생성된 지도 요약. */
+export async function createMyMap(
+  accessToken: string,
+  title: string,
+  description?: string,
+): Promise<MapSummary> {
   const name = title.trim()
   if (!name) throw new Error('지도 이름을 입력해 주세요')
   const uid = await verifyUid(accessToken)
@@ -230,7 +235,12 @@ export async function createMyMap(accessToken: string, title: string): Promise<M
   const appUserId = await ensureAppUser(db, uid)
   const { data: created, error } = await db
     .from('map')
-    .insert({ owner_id: appUserId, title: name, visibility: 'unlisted' })
+    .insert({
+      owner_id: appUserId,
+      title: name,
+      description: description?.trim() || null,
+      visibility: 'unlisted',
+    })
     .select('id, share_token')
     .single()
   if (error) throw new Error('map 생성: ' + error.message)
@@ -242,8 +252,13 @@ export async function createMyMap(accessToken: string, title: string): Promise<M
   }
 }
 
-/** 지도 이름 수정 — 소유권 검증 후 title 갱신. */
-export async function renameMyMap(accessToken: string, mapId: string, title: string): Promise<void> {
+/** 지도 이름·설명 수정 — 소유권 검증 후 title(+description) 갱신. */
+export async function renameMyMap(
+  accessToken: string,
+  mapId: string,
+  title: string,
+  description?: string,
+): Promise<void> {
   const name = title.trim()
   if (!name) throw new Error('지도 이름을 입력해 주세요')
   const uid = await verifyUid(accessToken)
@@ -251,7 +266,9 @@ export async function renameMyMap(accessToken: string, mapId: string, title: str
   const appUserId = await findAppUserId(db, uid)
   if (!appUserId) throw new Error('내 지도를 찾을 수 없습니다')
   await assertMapOwner(db, mapId, appUserId)
-  const { error } = await db.from('map').update({ title: name }).eq('id', mapId)
+  const patch: Record<string, unknown> = { title: name }
+  if (description !== undefined) patch.description = description.trim() || null
+  const { error } = await db.from('map').update(patch).eq('id', mapId)
   if (error) throw new Error('map 수정: ' + error.message)
 }
 
@@ -430,17 +447,97 @@ export async function addPlaceFromReel(input: {
   return { shareToken, mapId, placeId }
 }
 
+export interface MyMapDetail {
+  mapId: string
+  shareToken: string
+  title: string
+  description: string | null
+  pins: PinRow[]
+}
+
 /**
- * 한 지도의 핀만 조회 — `/my` **지도별 지연 로드**용(연 지도만 로드, 재방문은 클라 캐시).
- * 소유권 검증 후 listMapPins 재사용. (목록·카운트는 listMyMaps, 핀 상세는 이 함수)
+ * 내 지도 **전체 + 각 핀을 한 번에** 조회 — `/my` 로드용(전체 보기 + 지도별 필터는 클라에서).
+ * 지도 N개라도 왕복은 상수(맵 1 · 핀 1 · 장소∥인스타코드 병렬 1)로 placeId 합집합을 `.in()` 배치.
+ * 다 받아두면 "전체 보기"·지도 필터·전환이 모두 클라에서 즉시(전환마다 재조회 X).
+ * 아직 담은 적 없으면(app_user/map 없음) 빈 배열.
  */
-export async function getMyMapPins(accessToken: string, mapId: string): Promise<PinRow[]> {
+export async function getMyMapsWithPins(accessToken: string): Promise<MyMapDetail[]> {
   const uid = await verifyUid(accessToken)
   const db = createAdminClient()
   const appUserId = await findAppUserId(db, uid)
-  if (!appUserId) throw new Error('내 지도를 찾을 수 없습니다')
-  await assertMapOwner(db, mapId, appUserId)
-  return listMapPins(mapId)
+  if (!appUserId) return []
+
+  // 1) 내 지도 전부(생성순)
+  const { data: maps, error: e1 } = await db
+    .from('map')
+    .select('id, title, description, share_token')
+    .eq('owner_id', appUserId)
+    .order('created_at', { ascending: true })
+  if (e1) throw new Error('map 조회: ' + e1.message)
+  if (!maps || maps.length === 0) return []
+
+  const mapIds = maps.map((m) => m.id as string)
+
+  // 2) 모든 지도의 핀 한 번에(최근순)
+  const { data: pinRows, error: e2 } = await db
+    .from('map_pin')
+    .select('id, map_id, place_id, content_id, note')
+    .in('map_id', mapIds)
+    .order('added_at', { ascending: false })
+  if (e2) throw new Error('map_pin 조회: ' + e2.message)
+
+  const allPins = pinRows ?? []
+  const toDetail = (m: (typeof maps)[number], pins: PinRow[]): MyMapDetail => ({
+    mapId: m.id as string,
+    title: m.title as string,
+    description: (m.description as string | null) ?? null,
+    shareToken: m.share_token as string,
+    pins,
+  })
+  if (allPins.length === 0) return maps.map((m) => toDetail(m, []))
+
+  const placeIds = Array.from(new Set(allPins.map((p) => p.place_id as string)))
+
+  // 3) 장소 상세 · 4) 인스타 코드 — placeId 합집합으로 각각 1배치(병렬)
+  type PlaceRow = {
+    id: string
+    name: string
+    road_address: string | null
+    address: string | null
+    lat: number
+    lng: number
+    tags: string[] | null
+  }
+  const [placesRes, codesByPlace] = await Promise.all([
+    db.from('place').select('id, name, road_address, address, lat, lng, tags').in('id', placeIds),
+    instaCodesByPlace(db, placeIds),
+  ])
+  if (placesRes.error) throw new Error('place 조회: ' + placesRes.error.message)
+  const placeById = new Map(((placesRes.data ?? []) as PlaceRow[]).map((p) => [p.id, p]))
+
+  // 핀을 지도별로 묶기(map_pin은 이미 최근순 정렬)
+  const pinsByMap = new Map<string, PinRow[]>()
+  for (const p of allPins) {
+    const pl = placeById.get(p.place_id as string)
+    const row: PinRow = {
+      pinId: p.id as string,
+      placeId: p.place_id as string,
+      name: (pl?.name as string) ?? '(알 수 없음)',
+      roadAddress: (pl?.road_address as string | null) ?? null,
+      address: (pl?.address as string | null) ?? null,
+      lat: (pl?.lat as number) ?? 0,
+      lng: (pl?.lng as number) ?? 0,
+      tags: (pl?.tags as string[] | null) ?? [],
+      instaCodes: codesByPlace.get(p.place_id as string) ?? [],
+      contentId: (p.content_id as string | null) ?? null,
+      note: (p.note as string | null) ?? null,
+    }
+    const arr = pinsByMap.get(p.map_id as string) ?? []
+    arr.push(row)
+    pinsByMap.set(p.map_id as string, arr)
+  }
+
+  return maps.map((m) => toDetail(m, pinsByMap.get(m.id as string) ?? []))
 }
 
 /**

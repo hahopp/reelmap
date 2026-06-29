@@ -20,6 +20,7 @@ export type ExplorerItem = {
   instaCodes?: string[]
   placeId?: string // 담기용(공개 지도/탐색)
   contentId?: string | null // 출처 릴(있으면 담을 때 그 후보에 투표)
+  mapNames?: string[] // 소속 지도명(내 지도 "전체 보기"에서 어느 지도의 장소인지)
 }
 
 /**
@@ -146,8 +147,23 @@ export default function MapExplorer({
                     </CardTitle>
                     <CardDescription>{p.roadAddress || p.address || '주소 정보 없음'}</CardDescription>
                   </CardHeader>
-                  {(p.note || p.tags.length > 0 || (p.instaCodes && p.instaCodes.length > 0)) && (
+                  {(p.note ||
+                    p.tags.length > 0 ||
+                    (p.instaCodes && p.instaCodes.length > 0) ||
+                    (p.mapNames && p.mapNames.length > 0)) && (
                     <CardContent className="flex flex-col gap-2">
+                      {p.mapNames && p.mapNames.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {p.mapNames.map((mn) => (
+                            <span
+                              key={mn}
+                              className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                            >
+                              🗺 {mn}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       {p.note && <p className="text-sm text-foreground/80">📝 {p.note}</p>}
                       {p.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1">

@@ -1,40 +1,37 @@
 'use server'
 
 import {
-  getMyMapPins,
+  getMyMapsWithPins,
   removePinFromMyMap,
   addPlaceToMyMap,
   listMyMaps,
   createMyMap,
   renameMyMap,
   deleteMyMap,
+  type MyMapDetail,
   type MapSummary,
 } from '@/lib/consumer'
 import { searchPlaces, coord2address, resolveKakaoMapUrl } from '@/lib/places'
 import type { NormalizedPlace } from '@/lib/places/types'
 import type { KakaoUrlResolution } from '@/lib/kakao-url'
-import type { PinRow } from '@/lib/pins'
 
-export interface MyMapPinsResult {
+export interface MyMapsWithPinsResult {
   ok: boolean
-  pins?: PinRow[]
+  maps?: MyMapDetail[]
   error?: string
 }
 
 /**
- * 한 지도의 핀 조회 — `/my` 지도별 지연 로드용(연 지도만, 재방문은 클라 캐시).
+ * 내 지도 전체 + 각 핀 조회 — `/my` 로드용(전체 보기·지도 필터·전환은 클라에서).
  * (클라가 익명 access_token을 함께 보냄, 서버에서 검증).
  */
-export async function getMyMapPinsAction(
-  accessToken: string,
-  mapId: string,
-): Promise<MyMapPinsResult> {
+export async function getMyMapsAction(accessToken: string): Promise<MyMapsWithPinsResult> {
   try {
-    if (!accessToken || !mapId) return { ok: false, error: '잘못된 요청입니다' }
-    const pins = await getMyMapPins(accessToken, mapId)
-    return { ok: true, pins }
+    if (!accessToken) return { ok: false, error: '잘못된 요청입니다' }
+    const maps = await getMyMapsWithPins(accessToken)
+    return { ok: true, maps }
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : '지도를 불러오지 못했어요' }
+    return { ok: false, error: e instanceof Error ? e.message : '내 지도를 불러오지 못했어요' }
   }
 }
 
@@ -61,16 +58,17 @@ export interface CreateMapResult {
   error?: string
 }
 
-/** 새 지도 만들기. */
+/** 새 지도 만들기(설명 선택). */
 export async function createMapAction(input: {
   accessToken: string
   title: string
+  description?: string
 }): Promise<CreateMapResult> {
   try {
     if (!input?.accessToken || !input?.title?.trim()) {
       return { ok: false, error: '잘못된 요청입니다' }
     }
-    const map = await createMyMap(input.accessToken, input.title)
+    const map = await createMyMap(input.accessToken, input.title, input.description)
     return { ok: true, map }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : '지도를 만들지 못했어요' }
@@ -82,20 +80,21 @@ export interface MapMutationResult {
   error?: string
 }
 
-/** 지도 이름 수정. */
+/** 지도 이름·설명 수정. */
 export async function renameMapAction(input: {
   accessToken: string
   mapId: string
   title: string
+  description?: string
 }): Promise<MapMutationResult> {
   try {
     if (!input?.accessToken || !input?.mapId || !input?.title?.trim()) {
       return { ok: false, error: '잘못된 요청입니다' }
     }
-    await renameMyMap(input.accessToken, input.mapId, input.title)
+    await renameMyMap(input.accessToken, input.mapId, input.title, input.description)
     return { ok: true }
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : '이름 수정에 실패했어요' }
+    return { ok: false, error: e instanceof Error ? e.message : '저장에 실패했어요' }
   }
 }
 
