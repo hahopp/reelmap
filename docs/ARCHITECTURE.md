@@ -67,12 +67,12 @@ lib/                          # 도메인 로직 (대부분 'server-only')
 components/
   map/MapView.tsx             # 카카오 SDK 단일 경계(번호마커·focus이동·마커클릭)
   MapExplorer.tsx             # 지도+리스트 공용 뷰 (/m·/explore 동일 UX)
-  LocationPicker.tsx          # 공용 위치 선택(이름검색/카카오URL/지도클릭) — 액션 props 주입(어드민=게이트/소비자=비게이트)
+  LocationPicker.tsx          # 공용 위치 선택(이름검색/카카오URL/지도클릭) — 액션 props 주입. 무결과→지도 CTA·지도 클릭 핀+주소 즉시 표시
+  AddPlaceDialog.tsx          # 내 지도 장소 추가 — 릴 링크(선택,먼저)→위치→이름. 링크 있으면 릴 연결 후보 / 없으면 개인 핀
   LinkInput.tsx               # 홈/find 링크 입력(클라 검증→/find)
   SaveCandidateButton.tsx     # 담기 버튼(/find 후보, 익명 세션 보장→서버액션)
   SavePlaceButton.tsx         # 공개 지도/탐색에서 담기(+→✓, MapExplorer saveable 슬롯)
   RemovePinButton.tsx         # 내 지도 핀 제거(2단계 확인)
-  AddPlaceDialog.tsx          # 내 지도 장소 추가 다이얼로그(LocationPicker 3종→이름 확인→개인 핀)
   AddPlaceFromReel.tsx        # /find 무후보 시 직접 추가(LocationPicker→릴 연결 후보, MapPicker 재사용)
   EditPlaceDialog.tsx         # 내 지도 장소 편집(메모 항상 + created_by=나면 태그·릴 링크). 카드 ✎
   AuthButton.tsx              # 카카오 로그인/로그아웃(익명=linkIdentity 승격, onAuthStateChange)

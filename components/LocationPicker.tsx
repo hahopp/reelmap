@@ -26,7 +26,7 @@ export interface LocationPickerActions {
 
 /**
  * 공용 위치 선택기 — 3가지: 이름검색 · 카카오맵 URL · 지도에서 직접.
- * 어느 방법으로든 위치를 고르면 onPick 으로 알려준다. (지도는 해당 탭일 때만 로드)
+ * - 검색 무결과면 "지도에서 직접 선택" 유도, 지도 클릭 시 핀 표시 + 주소 즉시 표시.
  * 검색/URL/역지오코딩 액션은 props 로 주입 → 같은 UI 를 어드민(게이트)·소비자(비게이트)가 재사용.
  */
 export default function LocationPicker({
@@ -41,10 +41,13 @@ export default function LocationPicker({
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<NormalizedPlace[]>([])
   const [searching, setSearching] = useState(false)
+  const [searched, setSearched] = useState(false)
   // 카카오 URL
   const [url, setUrl] = useState('')
   // 지도 클릭
   const [picked, setPicked] = useState<{ lat: number; lng: number } | null>(null)
+  const [pickedAddr, setPickedAddr] = useState<{ address: string | null; roadAddress: string | null } | null>(null)
+  const [addrLoading, setAddrLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
@@ -54,6 +57,7 @@ export default function LocationPicker({
     setMsg(null)
     try {
       setResults(await actions.search(query))
+      setSearched(true)
     } catch {
       setMsg('검색 오류')
     } finally {
@@ -72,6 +76,7 @@ export default function LocationPicker({
     })
     setResults([])
     setQuery('')
+    setSearched(false)
   }
 
   async function applyUrl() {
@@ -95,14 +100,35 @@ export default function LocationPicker({
     }
   }
 
-  async function useClicked() {
-    if (!picked) return
-    setBusy(true)
-    const a = await actions.coord2address(picked.lat, picked.lng)
-    setBusy(false)
-    onPick({ externalId: null, name: null, lat: picked.lat, lng: picked.lng, address: a.address, roadAddress: a.roadAddress })
-    setPicked(null)
+  // 지도 클릭 → 핀 위치 저장 + 주소 즉시 역지오코딩(어디를 골랐는지 보이게)
+  async function onMapClick(c: { lat: number; lng: number }) {
+    setPicked(c)
+    setPickedAddr(null)
+    setAddrLoading(true)
+    try {
+      setPickedAddr(await actions.coord2address(c.lat, c.lng))
+    } catch {
+      setPickedAddr({ address: null, roadAddress: null })
+    } finally {
+      setAddrLoading(false)
+    }
   }
+
+  function useClicked() {
+    if (!picked) return
+    onPick({
+      externalId: null,
+      name: null,
+      lat: picked.lat,
+      lng: picked.lng,
+      address: pickedAddr?.address ?? null,
+      roadAddress: pickedAddr?.roadAddress ?? null,
+    })
+    setPicked(null)
+    setPickedAddr(null)
+  }
+
+  const noResults = searched && !searching && results.length === 0
 
   return (
     <Tabs value={tab} onValueChange={(v) => setTab(v as string)}>
@@ -117,7 +143,10 @@ export default function LocationPicker({
         <div className="flex gap-2">
           <Input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setSearched(false)
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
@@ -139,7 +168,9 @@ export default function LocationPicker({
               >
                 <div className="flex min-w-0 flex-col">
                   <span className="truncate text-sm font-medium">{r.name}</span>
-                  <span className="truncate text-xs text-muted-foreground">{r.roadAddress || r.address}</span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {r.roadAddress || r.address || '주소 정보 없음'}
+                  </span>
                 </div>
                 <Button type="button" variant="ghost" size="sm" onClick={() => pickResult(r)} className="shrink-0">
                   선택
@@ -147,6 +178,14 @@ export default function LocationPicker({
               </li>
             ))}
           </ul>
+        )}
+        {noResults && (
+          <div className="flex flex-col items-center gap-2 rounded-md border border-dashed p-4 text-center">
+            <p className="text-sm text-muted-foreground">검색 결과가 없어요.</p>
+            <Button type="button" variant="outline" size="sm" onClick={() => setTab('map')}>
+              지도에서 직접 선택하기 →
+            </Button>
+          </div>
         )}
       </TabsContent>
 
@@ -169,18 +208,27 @@ export default function LocationPicker({
 
       {/* 지도에서 직접 */}
       <TabsContent value="map" className="flex flex-col gap-2 pt-2">
-        <p className="text-xs text-muted-foreground">지도를 움직여 위치를 클릭하세요.</p>
+        <p className="text-xs text-muted-foreground">지도를 움직여 원하는 위치를 클릭하세요. 클릭한 곳에 핀이 찍혀요.</p>
         {tab === 'map' && (
-          <MapView className="h-56 rounded-lg border" onMapClick={(c) => setPicked(c)} />
+          <MapView
+            className="h-56 rounded-lg border"
+            markers={picked ? [{ id: 'picked', lat: picked.lat, lng: picked.lng }] : []}
+            onMapClick={onMapClick}
+          />
         )}
         {picked && (
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-muted-foreground">
-              선택 위치: {picked.lat.toFixed(5)}, {picked.lng.toFixed(5)}
+          <div className="flex flex-col gap-1.5 rounded-md border bg-card px-2.5 py-2">
+            <span className="text-xs font-medium">
+              📍 {addrLoading ? '주소 확인 중…' : pickedAddr?.roadAddress || pickedAddr?.address || '주소 정보 없음'}
             </span>
-            <Button type="button" size="sm" onClick={useClicked} disabled={busy} className="shrink-0">
-              이 위치 사용
-            </Button>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">
+                {picked.lat.toFixed(5)}, {picked.lng.toFixed(5)}
+              </span>
+              <Button type="button" size="sm" onClick={useClicked} disabled={busy} className="shrink-0">
+                이 위치 사용
+              </Button>
+            </div>
           </div>
         )}
       </TabsContent>
