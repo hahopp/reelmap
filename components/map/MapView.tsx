@@ -25,6 +25,10 @@ export interface MapViewProps {
   center?: { lat: number; lng: number }
   level?: number
   onMapClick?: (coord: { lat: number; lng: number }) => void
+  /** 지도 중앙 좌표 변경(드래그/줌이 멈춘 idle 시점) 보고 — centerPin 위치 선택용. */
+  onCenterChange?: (coord: { lat: number; lng: number }) => void
+  /** 화면 정중앙에 고정 핀 표시(지도를 끌어 위치를 맞추는 선택 UX). */
+  centerPin?: boolean
   onMarkerClick?: (id: string) => void
   focus?: { lat: number; lng: number } | null
   focusLevel?: number
@@ -42,6 +46,8 @@ export default function MapView({
   center,
   level = 9,
   onMapClick,
+  onCenterChange,
+  centerPin = false,
   onMarkerClick,
   focus,
   focusLevel = 5,
@@ -50,8 +56,13 @@ export default function MapView({
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<any>(null)
   const overlaysRef = useRef<any[]>([]) // 현재 그려진 마커/오버레이 — 재구성 시 정리용
+  const onCenterChangeRef = useRef(onCenterChange) // idle 리스너는 1회 등록 → 최신 콜백을 ref로 참조(stale 방지)
   const [ready, setReady] = useState(false)
   const jsKey = process.env.NEXT_PUBLIC_KAKAO_MAP_JS_KEY
+
+  useEffect(() => {
+    onCenterChangeRef.current = onCenterChange
+  }, [onCenterChange])
 
   // 선택된 위치로 부드럽게 이동 + 확대
   useEffect(() => {
@@ -118,6 +129,15 @@ export default function MapView({
           onMapClick({ lat: e.latLng.getLat(), lng: e.latLng.getLng() })
         })
       }
+      if (onCenterChangeRef.current) {
+        const reportCenter = () => {
+          const ctr = map.getCenter()
+          onCenterChangeRef.current?.({ lat: ctr.getLat(), lng: ctr.getLng() })
+        }
+        // 드래그/줌이 멈춘 뒤 한 번씩 보고(idle) + 초기 중심 1회 보고
+        kakao.maps.event.addListener(map, 'idle', reportCenter)
+        reportCenter()
+      }
       setReady(true) // 마커 렌더 effect 트리거
     })
   }
@@ -137,7 +157,30 @@ export default function MapView({
         strategy="afterInteractive"
         onReady={initMap}
       />
-      <div ref={mapRef} className={cn('h-[360px] w-full', className)} />
+      <div className={cn('relative h-[360px] w-full overflow-hidden', className)}>
+        <div ref={mapRef} className="h-full w-full" />
+        {centerPin && ready && (
+          // 화면 정중앙 고정 핀 — pointer-events-none 이라 지도 드래그는 그대로 통과, 핀 끝이 지도 중심
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-10">
+            <span className="absolute left-0 top-0 block h-1.5 w-3 -translate-x-1/2 -translate-y-1/2 rounded-[50%] bg-black/25 blur-[1px]" />
+            <svg
+              width="32"
+              height="40"
+              viewBox="0 0 32 40"
+              fill="none"
+              className="absolute left-0 top-0 -translate-x-1/2 -translate-y-full drop-shadow-[0_2px_3px_rgba(0,0,0,0.35)]"
+            >
+              <path
+                d="M16 1.5C8.27 1.5 2 7.77 2 15.5c0 9.4 11.2 20.7 13.2 22.6a1.1 1.1 0 0 0 1.6 0C18.8 36.2 30 24.9 30 15.5 30 7.77 23.73 1.5 16 1.5Z"
+                fill="#2f7d4f"
+                stroke="#fff"
+                strokeWidth="2.5"
+              />
+              <circle cx="16" cy="15.5" r="5" fill="#fff" />
+            </svg>
+          </div>
+        )}
+      </div>
     </>
   )
 }

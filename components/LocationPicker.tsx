@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { NormalizedPlace } from '@/lib/places/types'
 import type { KakaoUrlResolution } from '@/lib/kakao-url'
 import { Input } from '@/components/ui/input'
@@ -26,7 +26,7 @@ export interface LocationPickerActions {
 
 /**
  * 공용 위치 선택기 — 3가지: 이름검색 · 카카오맵 URL · 지도에서 직접.
- * - 검색 무결과면 "지도에서 직접 선택" 유도, 지도 클릭 시 핀 표시 + 주소 즉시 표시.
+ * - 검색 무결과면 "지도에서 직접 선택" 유도, 지도 중앙 고정 핀에 맞춰 위치 선택 + 주소 즉시 표시.
  * 검색/URL/역지오코딩 액션은 props 로 주입 → 같은 UI 를 어드민(게이트)·소비자(비게이트)가 재사용.
  */
 export default function LocationPicker({
@@ -44,10 +44,11 @@ export default function LocationPicker({
   const [searched, setSearched] = useState(false)
   // 카카오 URL
   const [url, setUrl] = useState('')
-  // 지도 클릭
+  // 지도 중앙 핀
   const [picked, setPicked] = useState<{ lat: number; lng: number } | null>(null)
   const [pickedAddr, setPickedAddr] = useState<{ address: string | null; roadAddress: string | null } | null>(null)
   const [addrLoading, setAddrLoading] = useState(false)
+  const addrReqRef = useRef(0) // 드래그 연속 시 역지오코딩 응답 순서 꼬임 방지(마지막 요청만 반영)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
@@ -100,17 +101,19 @@ export default function LocationPicker({
     }
   }
 
-  // 지도 클릭 → 핀 위치 저장 + 주소 즉시 역지오코딩(어디를 골랐는지 보이게)
-  async function onMapClick(c: { lat: number; lng: number }) {
+  // 지도 중앙(고정 핀) 좌표 변경 → 위치 저장 + 주소 즉시 역지오코딩(어디를 골랐는지 보이게)
+  async function onCenterChange(c: { lat: number; lng: number }) {
     setPicked(c)
+    const reqId = ++addrReqRef.current
     setPickedAddr(null)
     setAddrLoading(true)
     try {
-      setPickedAddr(await actions.coord2address(c.lat, c.lng))
+      const addr = await actions.coord2address(c.lat, c.lng)
+      if (addrReqRef.current === reqId) setPickedAddr(addr)
     } catch {
-      setPickedAddr({ address: null, roadAddress: null })
+      if (addrReqRef.current === reqId) setPickedAddr({ address: null, roadAddress: null })
     } finally {
-      setAddrLoading(false)
+      if (addrReqRef.current === reqId) setAddrLoading(false)
     }
   }
 
@@ -208,13 +211,9 @@ export default function LocationPicker({
 
       {/* 지도에서 직접 */}
       <TabsContent value="map" className="flex flex-col gap-2 pt-2">
-        <p className="text-xs text-muted-foreground">지도를 움직여 원하는 위치를 클릭하세요. 클릭한 곳에 핀이 찍혀요.</p>
+        <p className="text-xs text-muted-foreground">지도를 끌어 가운데 핀을 원하는 위치에 맞추세요.</p>
         {tab === 'map' && (
-          <MapView
-            className="h-56 rounded-lg border"
-            markers={picked ? [{ id: 'picked', lat: picked.lat, lng: picked.lng }] : []}
-            onMapClick={onMapClick}
-          />
+          <MapView className="h-56 rounded-lg border" centerPin onCenterChange={onCenterChange} />
         )}
         {picked && (
           <div className="flex flex-col gap-1.5 rounded-md border bg-card px-2.5 py-2">

@@ -376,8 +376,8 @@ export default function PlaceRegister({ mapId }: { mapId: string }) {
               onChange={(e) => setManualName(e.target.value)}
               placeholder="장소 이름 (예: ○○캠핑장)"
             />
-            <p className="text-xs text-muted-foreground">지도를 움직여 해당 위치를 클릭하세요.</p>
-            <MapView className="h-56 rounded-lg border" onMapClick={(c) => setPicked(c)} />
+            <p className="text-xs text-muted-foreground">지도를 끌어 가운데 핀을 해당 위치에 맞추세요.</p>
+            <MapView className="h-56 rounded-lg border" centerPin onCenterChange={(c) => setPicked(c)} />
             {picked && (
               <p className="text-xs text-muted-foreground">
                 선택 위치: {picked.lat.toFixed(5)}, {picked.lng.toFixed(5)}
