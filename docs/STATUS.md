@@ -45,6 +45,7 @@
   - **공개 지도/탐색에서 담기** — `/m`·`/explore` 카드 우상단 `SavePlaceButton`(+→✓) → `savePlaceToMyMap`(map_pin + 출처 릴 있으면 그 후보 투표). `MapExplorer saveable`. (발견→재사용 루프)
 - **카카오 로그인·계정 승격(Phase 3 코드)**: `components/AuthButton`(`/my` 헤더) — 익명 세션이면 `linkIdentity`로 **같은 uid에 카카오 신원 연결 → 데이터 그대로 영구 계정 승격**(다기기·alias 자동 해결), 세션 없으면 `signInWithOAuth`. `onAuthStateChange`로 상태 반응. 서버 로직 무변경(app_user를 auth uid로 키잉). 익명 사용자엔 `/my`에 로그인 유도 힌트. **운영 설정 완료 + 프로덕션 동작 검증됨**(2026-06-28): 카카오 인증→영구 계정(`is_anonymous:false`, `provider:kakao`)·익명 때 담은 핀 보존·재접속 세션 복원 확인. 설정 런북 = [SETUP_KAKAO_LOGIN.md](SETUP_KAKAO_LOGIN.md). (설정 중 만난 함정: Supabase **Site URL**을 프로덕션으로 안 바꾸면 로그인이 localhost로 튕김 → 런북 §4.)
 - **다중 지도 + 담을 지도 선택(Phase 3 증분, 코드·로컬 green / prod검증 대기)**: `/my`가 단일 지도 → **여러 지도 전환(칩)** + 생성·이름수정·삭제(마지막1개 가드). 담기 3경로 모두 **스마트 선택** — 지도 ≤1개면 기존처럼 원탭, ≥2개면 `MapPicker` 다이얼로그("어디에 담을까요?" + "새 지도에 담기"). `map` 테이블 그대로(마이그레이션 0, owner당 N개 이미 지원). 담은 뒤 `/my?map=<id>` 딥링크. 신규: `MapPicker`/`MapNameDialog` · 데이터층 `listMyMaps`/`createMyMap`/`renameMyMap`/`deleteMyMap`/`resolveTargetMap`(소유권 검증) · 담기·추가 액션에 `mapId` 옵션
+- **`/my` 지도 전환 구조 개선(성능, 코드·로컬 green · 런타임 스모크 OK)**: 전환마다 서버액션 1회(~6왕복 직렬)로 ≥1초 걸리던 것 → **로드 1회로 전 지도+핀을 한꺼번에**(`getMyMapsWithPins`: 맵·핀·장소∥인스타코드 = 왕복 상수, `.in()` 배치) → **지도 전환은 클라 상태 교체만(네트워크 0)**. 캐시(덮개)가 아니라 **데이터 패칭 형태를 고친** 구조 개선. 변이는 로컬 상태 갱신(핀 추가만 전체 재로드). `getMyMapWithPins`(단건)·`getMyMapAction` 제거, `getMyMapsAction` 신설. `MyMapClient`가 `maps[]`(핀 포함) 단일 상태로 단순화. 스모크 `scripts/smoke-mymaps.mjs`. (남은 레버: 매 액션의 `getUser()` 원격검증 → 로컬 JWT 검증 / Vercel↔Supabase 리전 일치 — 후속)
 - **새 장소 추가 고도화(Phase 2 M2 마무리, 코드·로컬 green)**: 위치 입력을 **3종**(이름검색 / 카카오맵 URL / 지도클릭)으로 통일 — 어드민 전용이던 `LocationPicker`를 `components/`로 옮기고 **액션을 props로 주입**(Next 16 지원), 어드민=게이트 액션·소비자=비게이트 액션 재사용. `/my` "+장소 추가"가 이제 3종 입력(지도클릭은 이름 직접 입력). **`/find` 후보 0건 진입** — "이 릴의 장소 직접 추가"로 위치 선택 → 내 지도에 담기 **+ 릴 연결**(content + `submission(source='user')` + 본인 selection + map_pin). 이렇게 만든 후보는 신뢰도 "1명 선택"으로 노출 → 다음 사람이 같은 릴 붙이면 발견(기여→재사용 루프 닫힘). 신규: `components/LocationPicker`(공용)·`components/AddPlaceFromReel` · `lib/places.resolveKakaoMapUrl`(URL 해석 공용) · `lib/consumer.addPlaceFromReel`·`upsertPlaceDedup`(place dedup 추출) · `app/my/actions`에 소비자 `previewKakaoUrlAction`/`coord2addressAction` · `app/find/actions.addPlaceFromReelAction`. `AddPlaceDialog`는 검색전용→3종 picker로 업그레이드.
 - **공유 미리보기(OG) + 인덱싱(Phase 4/5, 코드·로컬 green)**: 공유 링크가 카톡/SNS에서 카드 미리보기로. 루트 `metadataBase`+기본 openGraph/twitter + 정적 브랜드 OG 카드(`app/opengraph-image.tsx` — 한글 미포함이라 폰트 파일 불필요, Satori 기본폰트로 라틴 렌더). `/m` `generateMetadata`로 지도별 제목·설명(장소수)·커버(없으면 브랜드 카드 폴백) + **시드맵 검색노출 / 유저 공유링크 noindex**. `getPublicMap` `cache()`로 메타·페이지 중복조회 제거. 검증: prod 서버 curl로 메타태그 확인(seed=index+og:image, user=noindex+og:image). 신규 `lib/site.ts`. (지도명을 이미지 안에 한글로 그리는 건 폰트 필요 → 후속)
 - **코어 lib**: 인스타 정규화(16테스트) · 카카오 검색 어댑터 · kakao-url 파서 · tags 파서 · 신뢰도 라벨 · 공개 후보 조회(anon+RLS) · 담기 쓰기(토큰 검증)
@@ -92,6 +93,7 @@
 - [x] **중립화 버그** → `registerSeedPlace` 지도클릭(externalId 없는) 분기가 `category:'camping'` 하드코딩이던 것 → null 로 수정 ✅
 - [ ] **MapView 마커 리렌더**: `initMap()`에서 1회 생성 → markers prop 변경 무반응(현재 풀 네비로 가려짐). 동작 위험 있어 별도 작업으로
 - [ ] **dormant 코드 결정**: AI 미사용 동안 `lib/refine.ts`·`/api/captures/*` 유지 vs 제거(현재 "나중 재개"로 유지)
+- [ ] **소비자 액션 지연 레버(후속)**: 매 서버액션의 `verifyUid`가 `getUser()`로 토큰을 **원격 검증**(1홉) → 로컬 JWT 검증으로 대체 검토(읽기·쓰기 전부 1홉 절감) · **Vercel 함수 리전 ↔ Supabase 리전 일치**(교차리전 지연 제거) — `/my` 전환은 이미 네트워크 0이지만 초기 로드·담기/제거에 유효
 
 ## 6. 🔧 운영자 수동 작업 (코드로 불가)
 
@@ -106,7 +108,7 @@
 ## 7. 검증 / 명령어
 
 - `npm run dev` · `npm run build` · `npm test`(vitest) · `npx tsc --noEmit` · `npm run lint`
-- 스모크(`scripts/`): `check-db` · `smoke-map/kakao/register/public/cover` · `smoke-find/anon/save`(소비자 조회·익명로그인·담기 e2e) · `list-maps` · `seed-demo` · `demo-tag` · `backfill-address`
+- 스모크(`scripts/`): `check-db` · `smoke-map/kakao/register/public/cover` · `smoke-find/anon/save`(소비자 조회·익명로그인·담기 e2e) · `smoke-mymaps`(내 지도 전 지도+핀 조립) · `list-maps` · `seed-demo` · `demo-tag` · `backfill-address`
 - 마이그레이션: Supabase SQL Editor에 `supabase/migrations/*.sql` 적용 · 어드민 비번 = `.env.local` `ADMIN_PASSWORD` · 공개 URL 확인 = `node scripts/list-maps.mjs`
 
 ## 8. 갱신 규칙 (이 문서를 살아있게)

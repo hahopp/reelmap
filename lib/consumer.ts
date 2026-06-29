@@ -2,7 +2,8 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAnonClient, createAdminClient } from './supabase/server'
 import { coord2address } from './places'
-import { listMapPins, type PinRow } from './pins'
+import { type PinRow } from './pins'
+import { instaCodesByPlace } from './insta-codes'
 import { normalizeInstagramUrl } from './instagram'
 import type { NormalizedPlace } from './places/types'
 
@@ -430,7 +431,7 @@ export async function addPlaceFromReel(input: {
   return { shareToken, mapId, placeId }
 }
 
-export interface MyMap {
+export interface MyMapDetail {
   mapId: string
   shareToken: string
   title: string
@@ -438,34 +439,93 @@ export interface MyMap {
 }
 
 /**
- * 내 지도 조회 — 소유자의 지도 + 담긴 핀.
- * mapId 지정 시 그 지도(소유권 검증), 미지정 시 기본 지도(가장 먼저 만든 것).
- * 아직 담은 적 없으면(app_user/map 없음) null.
+ * 내 지도 **전체 + 각 핀을 한 번에** 조회 — `/my` 로드용.
+ * 지도 N개라도 왕복은 상수(맵 1 · 핀 1 · 장소∥인스타코드 병렬 1)로, placeId 합집합을 `.in()`으로 한꺼번에.
+ * 이렇게 다 받아두면 **지도 전환은 클라 상태 교체만**(전환마다 재조회 X). 데이터가 작아 전부 로드가 합리적.
+ * 아직 담은 적 없으면(app_user/map 없음) 빈 배열.
  */
-export async function getMyMapWithPins(
-  accessToken: string,
-  mapId?: string,
-): Promise<MyMap | null> {
+export async function getMyMapsWithPins(accessToken: string): Promise<MyMapDetail[]> {
   const uid = await verifyUid(accessToken)
   const db = createAdminClient()
-
   const appUserId = await findAppUserId(db, uid)
-  if (!appUserId) return null
+  if (!appUserId) return []
 
-  const base = db.from('map').select('id, title, share_token').eq('owner_id', appUserId)
-  const { data: map, error: e2 } = mapId
-    ? await base.eq('id', mapId).maybeSingle()
-    : await base.order('created_at', { ascending: true }).limit(1).maybeSingle()
-  if (e2) throw new Error('map 조회: ' + e2.message)
-  if (!map) return null
+  // 1) 내 지도 전부(생성순)
+  const { data: maps, error: e1 } = await db
+    .from('map')
+    .select('id, title, share_token')
+    .eq('owner_id', appUserId)
+    .order('created_at', { ascending: true })
+  if (e1) throw new Error('map 조회: ' + e1.message)
+  if (!maps || maps.length === 0) return []
 
-  const pins = await listMapPins(map.id as string)
-  return {
-    mapId: map.id as string,
-    shareToken: map.share_token as string,
-    title: map.title as string,
-    pins,
+  const mapIds = maps.map((m) => m.id as string)
+
+  // 2) 모든 지도의 핀 한 번에(최근순)
+  const { data: pinRows, error: e2 } = await db
+    .from('map_pin')
+    .select('id, map_id, place_id, content_id, note')
+    .in('map_id', mapIds)
+    .order('added_at', { ascending: false })
+  if (e2) throw new Error('map_pin 조회: ' + e2.message)
+
+  const allPins = pinRows ?? []
+  const emptyMaps = () =>
+    maps.map((m) => ({
+      mapId: m.id as string,
+      title: m.title as string,
+      shareToken: m.share_token as string,
+      pins: [] as PinRow[],
+    }))
+  if (allPins.length === 0) return emptyMaps()
+
+  const placeIds = Array.from(new Set(allPins.map((p) => p.place_id as string)))
+
+  // 3) 장소 상세 · 4) 인스타 코드 — placeId 합집합으로 각각 1배치(병렬)
+  type PlaceRow = {
+    id: string
+    name: string
+    road_address: string | null
+    address: string | null
+    lat: number
+    lng: number
+    tags: string[] | null
   }
+  const [placesRes, codesByPlace] = await Promise.all([
+    db.from('place').select('id, name, road_address, address, lat, lng, tags').in('id', placeIds),
+    instaCodesByPlace(db, placeIds),
+  ])
+  if (placesRes.error) throw new Error('place 조회: ' + placesRes.error.message)
+  const placeById = new Map(((placesRes.data ?? []) as PlaceRow[]).map((p) => [p.id, p]))
+
+  // 핀을 지도별로 묶기(map_pin은 이미 최근순 정렬)
+  const pinsByMap = new Map<string, PinRow[]>()
+  for (const p of allPins) {
+    const pl = placeById.get(p.place_id as string)
+    const row: PinRow = {
+      pinId: p.id as string,
+      placeId: p.place_id as string,
+      name: (pl?.name as string) ?? '(알 수 없음)',
+      roadAddress: (pl?.road_address as string | null) ?? null,
+      address: (pl?.address as string | null) ?? null,
+      lat: (pl?.lat as number) ?? 0,
+      lng: (pl?.lng as number) ?? 0,
+      tags: (pl?.tags as string[] | null) ?? [],
+      instaCodes: codesByPlace.get(p.place_id as string) ?? [],
+      contentId: (p.content_id as string | null) ?? null,
+      note: (p.note as string | null) ?? null,
+    }
+    const arr = pinsByMap.get(p.map_id as string) ?? []
+    arr.push(row)
+    pinsByMap.set(p.map_id as string, arr)
+  }
+
+  return maps.map((m) => ({
+    mapId: m.id as string,
+    title: m.title as string,
+    shareToken: m.share_token as string,
+    pins: pinsByMap.get(m.id as string) ?? [],
+  }))
 }
 
 /**

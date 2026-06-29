@@ -1,32 +1,35 @@
 'use server'
 
 import {
-  getMyMapWithPins,
+  getMyMapsWithPins,
   removePinFromMyMap,
   addPlaceToMyMap,
   listMyMaps,
   createMyMap,
   renameMyMap,
   deleteMyMap,
-  type MyMap,
+  type MyMapDetail,
   type MapSummary,
 } from '@/lib/consumer'
 import { searchPlaces, coord2address, resolveKakaoMapUrl } from '@/lib/places'
 import type { NormalizedPlace } from '@/lib/places/types'
 import type { KakaoUrlResolution } from '@/lib/kakao-url'
 
-export interface MyMapResult {
+export interface MyMapsWithPinsResult {
   ok: boolean
-  map?: MyMap | null
+  maps?: MyMapDetail[]
   error?: string
 }
 
-/** 내 지도 조회 — mapId 미지정 시 기본 지도. (클라가 익명 access_token을 함께 보냄, 서버에서 검증). */
-export async function getMyMapAction(accessToken: string, mapId?: string): Promise<MyMapResult> {
+/**
+ * 내 지도 전체 + 각 핀을 한 번에 조회 — `/my` 로드용(전환은 클라에서 상태 교체).
+ * (클라가 익명 access_token을 함께 보냄, 서버에서 검증).
+ */
+export async function getMyMapsAction(accessToken: string): Promise<MyMapsWithPinsResult> {
   try {
     if (!accessToken) return { ok: false, error: '잘못된 요청입니다' }
-    const map = await getMyMapWithPins(accessToken, mapId)
-    return { ok: true, map }
+    const maps = await getMyMapsWithPins(accessToken)
+    return { ok: true, maps }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : '내 지도를 불러오지 못했어요' }
   }
