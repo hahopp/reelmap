@@ -11,8 +11,9 @@ import {
   type MyMap,
   type MapSummary,
 } from '@/lib/consumer'
-import { searchPlaces } from '@/lib/places'
+import { searchPlaces, coord2address, resolveKakaoMapUrl } from '@/lib/places'
 import type { NormalizedPlace } from '@/lib/places/types'
+import type { KakaoUrlResolution } from '@/lib/kakao-url'
 
 export interface MyMapResult {
   ok: boolean
@@ -129,6 +130,25 @@ export async function removePinAction(input: {
 export async function searchPlacesAction(query: string): Promise<NormalizedPlace[]> {
   if (!query.trim()) return []
   return searchPlaces(query)
+}
+
+/** 카카오맵 URL → 좌표·이름·주소 해석 — 소비자 위치 선택용(비게이트, 읽기 전용 카카오 호출). */
+export async function previewKakaoUrlAction(url: string): Promise<KakaoUrlResolution> {
+  if (!url.trim()) return { ok: false, error: '카카오맵 URL을 입력하세요.' }
+  return resolveKakaoMapUrl(url)
+}
+
+/** 좌표 → 주소 역지오코딩 — 소비자 지도 클릭 위치용(비게이트). */
+export async function coord2addressAction(
+  lat: number,
+  lng: number,
+): Promise<{ address: string | null; roadAddress: string | null }> {
+  try {
+    const a = await coord2address(lng, lat)
+    return { address: a.address, roadAddress: a.roadAddress }
+  } catch {
+    return { address: null, roadAddress: null }
+  }
 }
 
 export interface AddPlaceResult {

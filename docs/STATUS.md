@@ -3,7 +3,7 @@
 > **역할**: 프로젝트 현재 상태 + 작업한 것 + 작업할 것. **작업 추적의 단일 진실원천.**
 > **대상**: AI 에이전트 · 사람
 > **안정성**: 🔴 변동 — 의미 있는 작업이 끝날 때마다 갱신한다(아래 "갱신 규칙").
-> **최종수정**: 2026-06-28
+> **최종수정**: 2026-06-29
 > **연관**: [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) 단계 상세 · [ARCHITECTURE.md](ARCHITECTURE.md) 코드 구조 · [PRD.md](PRD.md) 기획
 
 한 줄: 인스타에서 본 **그 장소를 주제별 지도로** 모아 공유. 포지셔닝=장소 일반(주제별) / 첫 버티컬·시딩=캠핑.
@@ -24,7 +24,7 @@
 |---|---|---|
 | 0 인프라 | ~100% | 배포·DB·키 완료. PostHog 키만 Phase 5 |
 | 1 데이터·백엔드 | ~90% | 9테이블·RLS·dedup·인스타정규화·신뢰도 라벨·투표집계 완료 |
-| **2 핵심 루프(M2)** | ~90% | 읽기+쓰기(담기)+내 지도 관리(뷰·핀 제거·장소 직접 추가·공유) ✅ / 새 장소 추가 고도화(URL/지도클릭·/find 무후보 진입) 남음 |
+| **2 핵심 루프(M2)** | ~95% | 읽기+쓰기(담기)+내 지도 관리(뷰·핀 제거·장소 직접 추가·공유) ✅ + **새 장소 추가 고도화**(검색/카카오URL/지도클릭 3종 · `/find` 무후보→릴 연결 직접 추가) ✅(2026-06-29, 코드·로컬 green) |
 | 3 인증·내 지도 | ~70% | 익명 인증 + **카카오 로그인·승격 검증 완료** ✅ + **다중 지도 + "어느 지도에 담을지" 선택** ✅(2026-06-28, 코드·로컬검증 green / 배포·prod검증 대기) / RLS 본인쓰기 남음 |
 | 4 공유·시드·신고 | ~85% | 공유·시드·공개뷰·담기 ✅ + **공유 미리보기(OG)·시드맵 인덱싱/유저맵 noindex** ✅(2026-06-28, 코드·로컬검증 green) / 신고 UI 남음 |
 | 5 계측·출시 | ~30% | OG ✅ / PostHog·베타 남음 |
@@ -45,6 +45,7 @@
   - **공개 지도/탐색에서 담기** — `/m`·`/explore` 카드 우상단 `SavePlaceButton`(+→✓) → `savePlaceToMyMap`(map_pin + 출처 릴 있으면 그 후보 투표). `MapExplorer saveable`. (발견→재사용 루프)
 - **카카오 로그인·계정 승격(Phase 3 코드)**: `components/AuthButton`(`/my` 헤더) — 익명 세션이면 `linkIdentity`로 **같은 uid에 카카오 신원 연결 → 데이터 그대로 영구 계정 승격**(다기기·alias 자동 해결), 세션 없으면 `signInWithOAuth`. `onAuthStateChange`로 상태 반응. 서버 로직 무변경(app_user를 auth uid로 키잉). 익명 사용자엔 `/my`에 로그인 유도 힌트. **운영 설정 완료 + 프로덕션 동작 검증됨**(2026-06-28): 카카오 인증→영구 계정(`is_anonymous:false`, `provider:kakao`)·익명 때 담은 핀 보존·재접속 세션 복원 확인. 설정 런북 = [SETUP_KAKAO_LOGIN.md](SETUP_KAKAO_LOGIN.md). (설정 중 만난 함정: Supabase **Site URL**을 프로덕션으로 안 바꾸면 로그인이 localhost로 튕김 → 런북 §4.)
 - **다중 지도 + 담을 지도 선택(Phase 3 증분, 코드·로컬 green / prod검증 대기)**: `/my`가 단일 지도 → **여러 지도 전환(칩)** + 생성·이름수정·삭제(마지막1개 가드). 담기 3경로 모두 **스마트 선택** — 지도 ≤1개면 기존처럼 원탭, ≥2개면 `MapPicker` 다이얼로그("어디에 담을까요?" + "새 지도에 담기"). `map` 테이블 그대로(마이그레이션 0, owner당 N개 이미 지원). 담은 뒤 `/my?map=<id>` 딥링크. 신규: `MapPicker`/`MapNameDialog` · 데이터층 `listMyMaps`/`createMyMap`/`renameMyMap`/`deleteMyMap`/`resolveTargetMap`(소유권 검증) · 담기·추가 액션에 `mapId` 옵션
+- **새 장소 추가 고도화(Phase 2 M2 마무리, 코드·로컬 green)**: 위치 입력을 **3종**(이름검색 / 카카오맵 URL / 지도클릭)으로 통일 — 어드민 전용이던 `LocationPicker`를 `components/`로 옮기고 **액션을 props로 주입**(Next 16 지원), 어드민=게이트 액션·소비자=비게이트 액션 재사용. `/my` "+장소 추가"가 이제 3종 입력(지도클릭은 이름 직접 입력). **`/find` 후보 0건 진입** — "이 릴의 장소 직접 추가"로 위치 선택 → 내 지도에 담기 **+ 릴 연결**(content + `submission(source='user')` + 본인 selection + map_pin). 이렇게 만든 후보는 신뢰도 "1명 선택"으로 노출 → 다음 사람이 같은 릴 붙이면 발견(기여→재사용 루프 닫힘). 신규: `components/LocationPicker`(공용)·`components/AddPlaceFromReel` · `lib/places.resolveKakaoMapUrl`(URL 해석 공용) · `lib/consumer.addPlaceFromReel`·`upsertPlaceDedup`(place dedup 추출) · `app/my/actions`에 소비자 `previewKakaoUrlAction`/`coord2addressAction` · `app/find/actions.addPlaceFromReelAction`. `AddPlaceDialog`는 검색전용→3종 picker로 업그레이드.
 - **공유 미리보기(OG) + 인덱싱(Phase 4/5, 코드·로컬 green)**: 공유 링크가 카톡/SNS에서 카드 미리보기로. 루트 `metadataBase`+기본 openGraph/twitter + 정적 브랜드 OG 카드(`app/opengraph-image.tsx` — 한글 미포함이라 폰트 파일 불필요, Satori 기본폰트로 라틴 렌더). `/m` `generateMetadata`로 지도별 제목·설명(장소수)·커버(없으면 브랜드 카드 폴백) + **시드맵 검색노출 / 유저 공유링크 noindex**. `getPublicMap` `cache()`로 메타·페이지 중복조회 제거. 검증: prod 서버 curl로 메타태그 확인(seed=index+og:image, user=noindex+og:image). 신규 `lib/site.ts`. (지도명을 이미지 안에 한글로 그리는 건 폰트 필요 → 후속)
 - **코어 lib**: 인스타 정규화(16테스트) · 카카오 검색 어댑터 · kakao-url 파서 · tags 파서 · 신뢰도 라벨 · 공개 후보 조회(anon+RLS) · 담기 쓰기(토큰 검증)
 - **운영자 인제스트 파이프라인(ADR 0002 · 배포됨)**: ①포착 `/admin/capture`(URL+답장 raw, 펼침·등록일시) → ②검토·확정 `/admin/review`(카드 직접 입력 — 위치 3종[이름검색/카카오URL/지도클릭]·원문·특징·태그·인스타링크 수정/열기·다중장소 → `registerSeedPlace` 지도 비의존) → ③편성 `/admin/places`(인라인 편집·태그필터·일괄 담기/삭제·전체선택). 스테이징 `instagram_capture`+`place.description`+`place_tag`(빈 어휘). 주제 일반(category/type_key nullable). 어드민 공통 탭 네비. 공용 `LocationPicker`·`MapExplorer`로 입력/공개 UX 통일.
@@ -52,7 +53,7 @@
 
 ## 4. 🔜 작업할 것 (Todo, 우선순위순)
 
-> **▶ 다음 세션 시작점**(2026-06-28 기준): ✅ 카카오 로그인 검증 완료 + ✅ **다중 지도 + 담을 지도 선택** 코드 완료(로컬 green) — **배포 후 prod에서 동작 검증** 필요(지도 생성·전환·담기 선택·딥링크). + ✅ **공유 미리보기(OG)·인덱싱** 코드 완료(로컬 green). 다음 **코드** 작업 후보: ① **신고 버튼**(distinct reporter 임계치 → `submission.status='flagged'`, 아래 C) / ② **시드 콘텐츠 채우기**(직접 작업, 아래 D) / ③ RLS 본인-쓰기 정책(아래 B) / ④ (후속) OG 이미지에 지도명 한글 렌더(한글 폰트 도입). · (미루기로 결정) 장소 외부 참고 링크 = `place_link` 별도 테이블(블로그 입력 만들 때). · 2축 태깅은 [ADR 0003](decisions/0003-tag-model-two-axis.md)(보류).
+> **▶ 다음 세션 시작점**(2026-06-29 기준): ✅ 카카오 로그인 검증 + ✅ 다중 지도/담을 지도 선택 + ✅ 공유 미리보기(OG)·인덱싱 + ✅ **새 장소 추가 고도화**(3종 입력 · `/find` 무후보→릴 연결 직접 추가) — 모두 코드·로컬 green. **미검증 누적분 prod 동작 확인 대기**(다중 지도 생성·전환·담기 선택·딥링크 / 새 장소 3종 입력 / `/find` 무후보 추가→재검색 시 후보 노출). 다음 **코드** 작업 후보(우선순위): ① **로딩·에러 UX 다듬기**(출시 품질, 아래 D) / ② PostHog 계측(가설 측정·기여율 포함, 베타 전, 아래 D) / ③ RLS 본인-쓰기(보안 하드닝, 아래 B) / ④ (후속) OG 이미지 지도명 한글 렌더. · **신고 버튼은 맨 마지막**(사용자 결정 — 서비스 동작에 지장 없는 기능, 출시 직전에). · **시드 콘텐츠 채우기**(직접 작업, 아래 D)는 출시 진짜 병목 — 개발과 병렬. · (미루기로 결정) 장소 외부 참고 링크 = `place_link` 별도 테이블(블로그 입력 만들 때). · 2축 태깅은 [ADR 0003](decisions/0003-tag-model-two-axis.md)(보류).
 
 ### ★ 인제스트 파이프라인 후속
 - [ ] **AI 정제 재개**(원하면): Vercel env(`ANTHROPIC_API_KEY`·`INGEST_API_TOKEN`) + `/admin/review`에 AI 버튼 복원(코드 dormant) + 정제 배치 트리거
@@ -63,7 +64,7 @@
 - [ ] 장소 목록 **페이지네이션**(현재 무제한 — Supabase 1000행 상한)
 
 ### A. M2 마무리 — 외부 의존성 없음, 바로 가능
-- [~] **증분 3 · 새 장소 추가**: `/my` "+ 장소 추가"(이름 검색→개인 핀) ✅(2026-06-22). 고도화 남음 — 카카오URL/지도클릭 입력, `/find` 무후보 진입, 릴 출처 연결(`submission`/`selection`) 옵션
+- [x] **증분 3 · 새 장소 추가**: `/my` "+ 장소 추가"(이름 검색→개인 핀) ✅(2026-06-22) + **고도화** ✅(2026-06-29, 코드·로컬 green) — 위치 입력 3종(검색/카카오URL/지도클릭, 공용 `LocationPicker`) · `/find` 무후보 시 "이 릴의 장소 직접 추가"(릴 출처 `submission(source='user')`+본인 selection 연결 → 다음 사람에게 후보로 노출). (선택 입력 고도화 더 가능하지만 핵심 루프는 닫힘)
 - [x] **증분 4 · 내 지도 뷰/관리**: `/my`에서 담은 핀 모아보기(`MapExplorer` 재사용) + 핀 제거(투표 회수) + 공유 ✅(2026-06-22)
 
 ### B. Phase 3 · 인증 & 내 지도
@@ -73,9 +74,8 @@
 - [ ] RLS 본인-쓰기 정책(현재 모든 쓰기 service_role)
 
 ### C. Phase 4 나머지 · 데이터 품질/공유
-- [ ] 신고 버튼 + distinct reporter 임계치 → `submission.status='flagged'`
-- [ ] 시드맵 OG/인덱싱 + 유저맵 `noindex` + 공유 미리보기
-- [x] 시드맵 OG/인덱싱 + 유저맵 `noindex` + 공유 미리보기 ✅(2026-06-28, 코드·로컬 green) — 루트 `metadataBase`+기본 openGraph/twitter + **정적 브랜드 OG 카드**(`app/opengraph-image.tsx`, 한글 미포함→폰트 불필요). `/m` 동적 `generateMetadata`(지도명·장소수 → og:title/description, 커버 있으면 커버 사진 없으면 브랜드 카드 폴백) + **시드맵=index / 유저 공유링크=noindex**. (한글을 이미지 안에 그리는 건 Korean 폰트 필요 → 후속)
+- [ ] 신고 버튼 + distinct reporter 임계치 → `submission.status='flagged'` — **우선순위 최하(출시 직전)**: 서비스 동작에 지장 없는 기능(2026-06-28 사용자 결정)
+- [x] 시드맵 OG/인덱싱 + 유저맵 `noindex` + 공유 미리보기 ✅(2026-06-28, 코드·로컬 green · prod 메타태그 검증) — 루트 `metadataBase`+기본 openGraph/twitter + **정적 브랜드 OG 카드**(`app/opengraph-image.tsx`, 한글 미포함→폰트 불필요). `/m` 동적 `generateMetadata`(지도명·장소수 → og:title/description, 커버 있으면 커버 사진 없으면 브랜드 카드 폴백) + **시드맵=index / 유저 공유링크=noindex**. (한글을 이미지 안에 그리는 건 Korean 폰트 필요 → 후속)
 - [x] 공개 지도(`/m`)·탐색(`/explore`)에서 소비자 "담기" ✅(2026-06-22) — `savePlaceToMyMap`(담기 + 출처 릴 있으면 그 후보 투표) · `SavePlaceButton`(+→✓) · `MapExplorer` `saveable`. `/m`·`/explore` 헤더에 내 지도 링크
 
 ### D. Phase 5 · 계측 & 출시

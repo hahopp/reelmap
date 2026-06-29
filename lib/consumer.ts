@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAnonClient, createAdminClient } from './supabase/server'
 import { coord2address } from './places'
 import { listMapPins, type PinRow } from './pins'
+import { normalizeInstagramUrl } from './instagram'
 import type { NormalizedPlace } from './places/types'
 
 /**
@@ -288,6 +289,52 @@ async function assertMapOwner(db: SupabaseClient, mapId: string, appUserId: stri
 }
 
 /**
+ * place dedup upsert — external id 있으면 재사용, 없으면 신규. 주소 없으면 좌표로 역지오코딩.
+ * addPlaceToMyMap / addPlaceFromReel 공용.
+ */
+async function upsertPlaceDedup(db: SupabaseClient, p: NormalizedPlace, createdBy: string): Promise<string> {
+  let address = p.address
+  let roadAddress = p.roadAddress
+  if (!address && !roadAddress) {
+    try {
+      const a = await coord2address(p.lng, p.lat)
+      address = a.address
+      roadAddress = a.roadAddress
+    } catch {
+      // 주소 조회 실패는 무시(좌표만으로도 등록)
+    }
+  }
+
+  if (p.externalId) {
+    const { data: existing, error: fe } = await db
+      .from('place')
+      .select('id')
+      .eq('external_provider', p.provider)
+      .eq('external_place_id', p.externalId)
+      .maybeSingle()
+    if (fe) throw new Error('place 조회: ' + fe.message)
+    if (existing) return existing.id as string
+  }
+
+  const { data: created, error: pe } = await db
+    .from('place')
+    .insert({
+      name: p.name,
+      lat: p.lat,
+      lng: p.lng,
+      external_provider: p.externalId ? p.provider : null,
+      external_place_id: p.externalId,
+      address,
+      road_address: roadAddress,
+      created_by: createdBy,
+    })
+    .select('id')
+    .single()
+  if (pe) throw new Error('place 생성: ' + pe.message)
+  return created.id as string
+}
+
+/**
  * 내 지도에 장소 직접 추가(릴 없는 개인 핀) — 검색/선택한 장소를 바로 담는다.
  * place dedup upsert(external) + map_pin(content_id 없음). 투표(submission/selection)는 만들지 않음.
  * @returns 새로(또는 기존) 핀의 placeId
@@ -301,51 +348,8 @@ export async function addPlaceToMyMap(input: {
   const db = createAdminClient()
   const appUserId = await ensureAppUser(db, uid)
   const { mapId } = await resolveTargetMap(db, appUserId, input.mapId)
-  const p = input.place
 
-  // 주소 없으면 좌표로 역지오코딩
-  let address = p.address
-  let roadAddress = p.roadAddress
-  if (!address && !roadAddress) {
-    try {
-      const a = await coord2address(p.lng, p.lat)
-      address = a.address
-      roadAddress = a.roadAddress
-    } catch {
-      // 주소 조회 실패는 무시(좌표만으로도 등록)
-    }
-  }
-
-  // place dedup upsert (external id 있으면 재사용)
-  let placeId: string | null = null
-  if (p.externalId) {
-    const { data: existing, error: fe } = await db
-      .from('place')
-      .select('id')
-      .eq('external_provider', p.provider)
-      .eq('external_place_id', p.externalId)
-      .maybeSingle()
-    if (fe) throw new Error('place 조회: ' + fe.message)
-    if (existing) placeId = existing.id as string
-  }
-  if (!placeId) {
-    const { data: created, error: pe } = await db
-      .from('place')
-      .insert({
-        name: p.name,
-        lat: p.lat,
-        lng: p.lng,
-        external_provider: p.externalId ? p.provider : null,
-        external_place_id: p.externalId,
-        address,
-        road_address: roadAddress,
-        created_by: appUserId,
-      })
-      .select('id')
-      .single()
-    if (pe) throw new Error('place 생성: ' + pe.message)
-    placeId = created.id as string
-  }
+  const placeId = await upsertPlaceDedup(db, input.place, appUserId)
 
   // 내 지도에 담기 (개인 핀 — content_id 없음). 이미 있으면 멱등.
   const { error: me } = await db
@@ -354,6 +358,76 @@ export async function addPlaceToMyMap(input: {
   if (me) throw new Error('map_pin: ' + me.message)
 
   return { placeId }
+}
+
+/**
+ * 릴(인스타 링크) + 장소를 직접 등록하고 내 지도에 담는다 — `/find` 후보 0건일 때 사용자 기여 경로.
+ * content 업서트 + place dedup + submission(source='user', 본인 제출) + selection(본인 1표) + map_pin(릴 연결).
+ * 이렇게 만든 후보는 신뢰도 라벨에서 "N명 선택"(투표 1)으로 노출 → 다음 사람이 같은 릴을 붙이면 발견.
+ * @returns 내 지도 share_token·mapId 와 placeId
+ */
+export async function addPlaceFromReel(input: {
+  accessToken: string
+  instagramUrl: string
+  place: NormalizedPlace
+  mapId?: string
+}): Promise<SaveResult & { placeId: string }> {
+  const norm = normalizeInstagramUrl(input.instagramUrl)
+  if (!norm) throw new Error('유효한 인스타그램 링크가 아닙니다')
+
+  const uid = await verifyUid(input.accessToken)
+  const db = createAdminClient()
+  const appUserId = await ensureAppUser(db, uid)
+  const { mapId, shareToken } = await resolveTargetMap(db, appUserId, input.mapId)
+
+  // 1) content 업서트(릴)
+  const { error: ce } = await db
+    .from('content')
+    .upsert(
+      { id: norm.postId, source_url: norm.canonicalUrl, platform: 'instagram' },
+      { onConflict: 'id' },
+    )
+  if (ce) throw new Error('content: ' + ce.message)
+
+  // 2) place dedup upsert
+  const placeId = await upsertPlaceDedup(db, input.place, appUserId)
+
+  // 3) submission(콘텐츠 × 장소 후보, 사용자 출처)
+  const { data: sub, error: se } = await db
+    .from('submission')
+    .upsert(
+      {
+        content_id: norm.postId,
+        place_id: placeId,
+        submitted_by: appUserId,
+        source: 'user',
+        status: 'active',
+      },
+      { onConflict: 'content_id,place_id' },
+    )
+    .select('id')
+    .single()
+  if (se) throw new Error('submission: ' + se.message)
+
+  // 4) 본인 투표(selection) — 멱등
+  const { error: ve } = await db
+    .from('selection')
+    .upsert(
+      { user_id: appUserId, submission_id: sub.id as string },
+      { onConflict: 'user_id,submission_id' },
+    )
+  if (ve) throw new Error('selection: ' + ve.message)
+
+  // 5) 내 지도에 담기(릴 연결)
+  const { error: me } = await db
+    .from('map_pin')
+    .upsert(
+      { map_id: mapId, place_id: placeId, content_id: norm.postId },
+      { onConflict: 'map_id,place_id' },
+    )
+  if (me) throw new Error('map_pin: ' + me.message)
+
+  return { shareToken, mapId, placeId }
 }
 
 export interface MyMap {

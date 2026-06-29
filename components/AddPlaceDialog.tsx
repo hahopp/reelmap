@@ -2,8 +2,14 @@
 
 import { useState } from 'react'
 import { getBrowserSupabase } from '@/lib/supabase/client'
-import { searchPlacesAction, addPlaceAction } from '@/app/my/actions'
+import {
+  searchPlacesAction,
+  previewKakaoUrlAction,
+  coord2addressAction,
+  addPlaceAction,
+} from '@/app/my/actions'
 import type { NormalizedPlace } from '@/lib/places/types'
+import LocationPicker, { type PickedLocation } from '@/components/LocationPicker'
 import {
   Dialog,
   DialogTrigger,
@@ -14,10 +20,11 @@ import {
 } from '@/components/ui/dialog'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 /**
- * 내 지도에 장소 직접 추가 — 이름 검색 → 결과 선택 → 추가(릴 없는 개인 핀).
- * 익명 세션이 없으면 추가 시점에 자동 생성(담기와 동일).
+ * 내 지도에 장소 직접 추가 — 위치 선택(이름검색 / 카카오맵 URL / 지도클릭) → 이름 확인 → 추가.
+ * 릴 없는 개인 핀(submission/selection 안 만듦). 익명 세션이 없으면 추가 시점에 자동 생성.
  */
 export default function AddPlaceDialog({
   onAdded,
@@ -34,19 +41,16 @@ export default function AddPlaceDialog({
   triggerClassName?: string
 }) {
   const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState<NormalizedPlace[]>([])
-  const [searched, setSearched] = useState(false)
-  const [searching, setSearching] = useState(false)
-  const [addingKey, setAddingKey] = useState<string | null>(null)
+  const [picked, setPicked] = useState<PickedLocation | null>(null)
+  const [name, setName] = useState('')
+  const [adding, setAdding] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   function reset() {
-    setQuery('')
-    setResults([])
-    setSearched(false)
+    setPicked(null)
+    setName('')
     setError(null)
-    setAddingKey(null)
+    setAdding(false)
   }
 
   function onOpenChange(v: boolean) {
@@ -54,23 +58,15 @@ export default function AddPlaceDialog({
     if (!v) reset()
   }
 
-  async function doSearch() {
-    if (!query.trim()) return
-    setSearching(true)
+  function handlePick(loc: PickedLocation) {
+    setPicked(loc)
+    setName(loc.name ?? '')
     setError(null)
-    try {
-      setResults(await searchPlacesAction(query))
-      setSearched(true)
-    } catch {
-      setError('검색 중 오류가 났어요')
-    } finally {
-      setSearching(false)
-    }
   }
 
-  async function add(r: NormalizedPlace) {
-    const key = r.externalId ?? r.name
-    setAddingKey(key)
+  async function add() {
+    if (!picked || !name.trim()) return
+    setAdding(true)
     setError(null)
     try {
       const sb = getBrowserSupabase()
@@ -84,14 +80,23 @@ export default function AddPlaceDialog({
       }
       if (!session) throw new Error('세션 생성 실패')
 
-      const res = await addPlaceAction({ accessToken: session.access_token, place: r, mapId })
+      const place: NormalizedPlace = {
+        provider: 'kakao',
+        externalId: picked.externalId,
+        name: name.trim(),
+        address: picked.address,
+        roadAddress: picked.roadAddress,
+        lat: picked.lat,
+        lng: picked.lng,
+      }
+      const res = await addPlaceAction({ accessToken: session.access_token, place, mapId })
       if (!res.ok) throw new Error(res.error ?? '추가 실패')
 
       onAdded()
       onOpenChange(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : '추가에 실패했어요')
-      setAddingKey(null)
+      setAdding(false)
     }
   }
 
@@ -110,69 +115,60 @@ export default function AddPlaceDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>장소 추가</DialogTitle>
-          <DialogDescription>이름이나 주소로 검색해 내 지도에 바로 담아요.</DialogDescription>
+          <DialogDescription>
+            이름 검색·카카오맵 URL·지도에서 직접 — 어느 방법으로든 위치를 골라 내 지도에 담아요.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="flex gap-2">
-          <Input
-            autoFocus
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                doSearch()
-              }
+        {!picked ? (
+          <LocationPicker
+            onPick={handlePick}
+            actions={{
+              search: searchPlacesAction,
+              previewUrl: previewKakaoUrlAction,
+              coord2address: coord2addressAction,
             }}
-            placeholder="장소명 또는 주소"
           />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={doSearch}
-            disabled={searching}
-            className="shrink-0"
-          >
-            {searching ? '검색중…' : '검색'}
-          </Button>
-        </div>
-
-        {results.length > 0 ? (
-          <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto">
-            {results.map((r) => {
-              const key = r.externalId ?? r.name
-              return (
-                <li
-                  key={key}
-                  className="flex items-center justify-between gap-2 rounded-md border bg-card px-2.5 py-2"
-                >
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate text-sm font-medium">{r.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {r.roadAddress || r.address || '주소 정보 없음'}
-                    </span>
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => add(r)}
-                    disabled={addingKey !== null}
-                    className="shrink-0"
-                  >
-                    {addingKey === key ? '추가중…' : '추가'}
-                  </Button>
-                </li>
-              )
-            })}
-          </ul>
         ) : (
-          searched &&
-          !searching && (
-            <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
-              검색 결과가 없어요. 다른 이름으로 시도해 보세요.
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="add-place-name">이름</Label>
+              <Input
+                id="add-place-name"
+                autoFocus
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="장소 이름"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              📍 {picked.roadAddress || picked.address || '주소 정보 없음'} ({picked.lat.toFixed(4)},{' '}
+              {picked.lng.toFixed(4)})
             </p>
-          )
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={add}
+                disabled={adding || !name.trim()}
+                className="flex-1"
+              >
+                {adding ? '추가중…' : '내 지도에 추가'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setPicked(null)
+                  setName('')
+                }}
+                disabled={adding}
+              >
+                다시 선택
+              </Button>
+            </div>
+          </div>
         )}
 
         {error && (

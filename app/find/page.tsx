@@ -7,6 +7,7 @@ import { lookupCandidatesByPostId } from '@/lib/public-lookup'
 import { trustLabel, type TrustKind } from '@/lib/trust'
 import LinkInput from '@/components/LinkInput'
 import SaveCandidateButton from '@/components/SaveCandidateButton'
+import AddPlaceFromReel from '@/components/AddPlaceFromReel'
 
 export const metadata = { title: '장소 찾기 · ReelMap', robots: { index: false } }
 
@@ -79,12 +80,13 @@ export default async function FindPage({
         </div>
 
         {candidates.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed p-10 text-center">
+          <div className="flex w-full flex-col items-center gap-3 rounded-2xl border border-dashed p-6 text-center sm:p-10">
             <span className="text-3xl">🔍</span>
             <p className="font-medium">아직 이 릴에 등록된 장소가 없어요.</p>
             <p className="text-sm text-muted-foreground">
-              곧 직접 장소를 추가할 수 있게 준비 중이에요.
+              릴 속 장소를 직접 추가하면 내 지도에 담기고, 다음 사람도 찾을 수 있어요.
             </p>
+            <AddPlaceFromReel instagramUrl={norm.canonicalUrl} />
             <Link
               href="/explore"
               className="text-sm font-medium text-primary underline-offset-4 hover:underline"
