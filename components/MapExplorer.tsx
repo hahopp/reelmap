@@ -34,6 +34,8 @@ export default function MapExplorer({
   filtered,
   emptyText = '아직 등록된 장소가 없어요.',
   noMatchText = '선택한 태그에 맞는 장소가 없어요.',
+  loadingText = '불러오는 중…',
+  loading = false,
   renderItemAction,
   saveable = false,
 }: {
@@ -44,6 +46,9 @@ export default function MapExplorer({
   filtered: boolean
   emptyText?: string
   noMatchText?: string
+  loadingText?: string
+  /** true면 지도/리스트 영역에 로딩 표시(헤더·칩은 그대로 노출). 지도별 지연 로드용. */
+  loading?: boolean
   /** 카드 우상단에 표시할 항목별 액션(예: 제거 버튼). 카드 포커스와 분리(stopPropagation 처리됨). */
   renderItemAction?: (item: ExplorerItem) => ReactNode
   /** true면 placeId 있는 항목 우상단에 "담기" 버튼 표시(공개 지도/탐색용). renderItemAction 이 우선. */
@@ -78,7 +83,7 @@ export default function MapExplorer({
           />
         ) : (
           <div className="flex h-full items-center justify-center bg-muted text-sm text-muted-foreground">
-            표시할 장소가 없어요
+            {loading ? loadingText : '표시할 장소가 없어요'}
           </div>
         )}
       </div>
@@ -88,7 +93,11 @@ export default function MapExplorer({
 
         {allTags.length > 0 && <TagFilter allTags={allTags} basePath={basePath} />}
 
-        {items.length === 0 ? (
+        {loading ? (
+          <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+            {loadingText}
+          </p>
+        ) : items.length === 0 ? (
           <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
             {filtered ? noMatchText : emptyText}
           </p>

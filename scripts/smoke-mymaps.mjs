@@ -1,5 +1,6 @@
-// getMyMapsWithPins 쿼리 시퀀스 런타임 스모크. 실행: node scripts/smoke-mymaps.mjs
-// 핀이 있는 첫 owner를 골라 maps→map_pin(.in)→place(.in)∥submission 조립이 동작하는지 확인.
+// /my 데이터 조립 런타임 스모크. 실행: node scripts/smoke-mymaps.mjs
+// 핀이 있는 첫 owner를 골라 maps(목록)→map_pin→place∥submission 조립이 동작하는지 확인.
+// (운영 코드: 목록=listMyMaps · 지도별 핀=getMyMapPins→listMapPins. 여기선 같은 쿼리 모양을 한 번에 검증.)
 import { readFileSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
 
@@ -76,4 +77,4 @@ for (const m of maps) {
     )
   }
 }
-console.log('\n✅ getMyMapsWithPins 쿼리 시퀀스 OK')
+console.log('\n✅ /my 데이터 조립(목록 + 지도별 핀) 쿼리 시퀀스 OK')

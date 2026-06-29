@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { getBrowserSupabase } from '@/lib/supabase/client'
 import {
-  getMyMapsAction,
+  listMyMapsAction,
+  getMyMapPinsAction,
   removePinAction,
   createMapAction,
   renameMapAction,
@@ -16,7 +17,8 @@ import AddPlaceDialog from '@/components/AddPlaceDialog'
 import MapNameDialog from '@/components/MapNameDialog'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { MyMapDetail } from '@/lib/consumer'
+import type { MapSummary } from '@/lib/consumer'
+import type { PinRow } from '@/lib/pins'
 
 type Status = 'loading' | 'empty' | 'ready' | 'error'
 
@@ -38,83 +40,116 @@ export default function MyMapClient() {
   const [status, setStatus] = useState<Status>('loading')
   const [token, setToken] = useState<string | null>(null)
   const [isAnonymous, setIsAnonymous] = useState(false)
-  const [maps, setMaps] = useState<MyMapDetail[]>([])
+  const [maps, setMaps] = useState<MapSummary[]>([]) // 칩 목록(제목·카운트) — 진입 시 즉시
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [pinsByMap, setPinsByMap] = useState<Record<string, PinRow[]>>({}) // 지도별 핀(지연 로드 캐시)
+  const [pinsError, setPinsError] = useState<{ mapId: string; msg: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  // 전체 로드: 세션 → 모든 지도+핀 1회 조회 → 선택(preferMapId > ?map= > 첫째). 이후 전환은 네트워크 없음.
-  const load = useCallback(async (preferMapId?: string) => {
-    try {
-      const sb = getBrowserSupabase()
-      const {
-        data: { session },
-      } = await sb.auth.getSession()
-      setIsAnonymous(session?.user?.is_anonymous === true)
-      if (!session) {
-        setStatus('empty')
-        return
-      }
-      setToken(session.access_token)
-
-      const res = await getMyMapsAction(session.access_token)
-      if (!res.ok) {
-        setError(res.error ?? '내 지도를 불러오지 못했어요')
-        setStatus('error')
-        return
-      }
-      const ms = res.maps ?? []
-      setMaps(ms)
-      if (ms.length === 0) {
-        setStatus('empty')
-        return
-      }
-      const urlMap =
-        typeof window !== 'undefined'
-          ? new URLSearchParams(window.location.search).get('map')
-          : null
-      const want = preferMapId ?? urlMap ?? undefined
-      const chosen = ms.find((m) => m.mapId === want) ?? ms[0]
-      setSelectedId(chosen.mapId)
-      setStatus('ready')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '내 지도를 불러오지 못했어요')
-      setStatus('error')
+  // 한 지도의 핀을 지연 로드 → 캐시. (이미 캐시된 지도는 호출부에서 건너뜀)
+  const fetchPins = useCallback(async (mapId: string, accessToken: string) => {
+    setPinsError((e) => (e?.mapId === mapId ? null : e))
+    const res = await getMyMapPinsAction(accessToken, mapId)
+    if (!res.ok) {
+      setPinsError({ mapId, msg: res.error ?? '지도를 불러오지 못했어요' })
+      return
     }
+    setPinsByMap((m) => ({ ...m, [mapId]: res.pins ?? [] }))
   }, [])
+
+  // 진입 로드: 세션 → 지도 목록(칩)만 즉시 → 선택 지도 핀만 지연 로드.
+  const loadList = useCallback(
+    async (preferMapId?: string) => {
+      try {
+        const sb = getBrowserSupabase()
+        const {
+          data: { session },
+        } = await sb.auth.getSession()
+        setIsAnonymous(session?.user?.is_anonymous === true)
+        if (!session) {
+          setStatus('empty')
+          return
+        }
+        setToken(session.access_token)
+
+        const list = await listMyMapsAction(session.access_token)
+        if (!list.ok) {
+          setError(list.error ?? '지도 목록을 불러오지 못했어요')
+          setStatus('error')
+          return
+        }
+        const ms = list.maps ?? []
+        setMaps(ms)
+        if (ms.length === 0) {
+          setStatus('empty')
+          return
+        }
+        const urlMap =
+          typeof window !== 'undefined'
+            ? new URLSearchParams(window.location.search).get('map')
+            : null
+        const want = preferMapId ?? urlMap ?? undefined
+        const chosen = ms.find((m) => m.mapId === want) ?? ms[0]
+        setSelectedId(chosen.mapId)
+        setStatus('ready')
+        void fetchPins(chosen.mapId, session.access_token)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : '내 지도를 불러오지 못했어요')
+        setStatus('error')
+      }
+    },
+    [fetchPins],
+  )
 
   useEffect(() => {
     void (async () => {
-      await load()
+      await loadList()
     })()
-  }, [load])
+  }, [loadList])
 
   const selected = maps.find((m) => m.mapId === selectedId) ?? null
+  const currentPins = selectedId ? pinsByMap[selectedId] : undefined
 
-  // 지도 전환 — 이미 불러온 데이터라 상태 교체만(네트워크 없음).
+  // 지도 전환 — 캐시에 있으면 즉시(네트워크 0), 없으면 그 지도만 지연 로드. (에러난 지도 다시 누르면 재시도)
   function selectMap(mapId: string) {
-    if (mapId === selectedId) return
+    if (mapId === selectedId && pinsByMap[mapId]) return
     setSelectedId(mapId)
     setError(null)
     setConfirmDelete(false)
     pushMapUrl(mapId)
+    if (!pinsByMap[mapId] && token) void fetchPins(mapId, token)
   }
+
+  // 선택 지도 핀 강제 재로드 + 칩 카운트 동기화(장소 추가/제거 후).
+  const reloadSelectedPins = useCallback(async () => {
+    if (!token || !selectedId) return
+    const res = await getMyMapPinsAction(token, selectedId)
+    if (!res.ok) return
+    const pins = res.pins ?? []
+    setPinsByMap((m) => ({ ...m, [selectedId]: pins }))
+    setMaps((ms) => ms.map((mm) => (mm.mapId === selectedId ? { ...mm, pinCount: pins.length } : mm)))
+  }, [token, selectedId])
 
   const removePin = useCallback(
     async (pinId: string) => {
-      if (!token) return
+      if (!token || !selectedId) return
       const res = await removePinAction({ accessToken: token, pinId })
       if (!res.ok) {
         setError(res.error ?? '제거에 실패했어요')
         throw new Error(res.error ?? '제거 실패')
       }
       setError(null)
+      setPinsByMap((m) => ({
+        ...m,
+        [selectedId]: (m[selectedId] ?? []).filter((p) => p.pinId !== pinId),
+      }))
       setMaps((ms) =>
-        ms.map((m) =>
-          m.mapId === selectedId ? { ...m, pins: m.pins.filter((p) => p.pinId !== pinId) } : m,
+        ms.map((mm) =>
+          mm.mapId === selectedId ? { ...mm, pinCount: Math.max(0, mm.pinCount - 1) } : mm,
         ),
       )
     },
@@ -125,16 +160,12 @@ export default function MyMapClient() {
     if (!token) return
     const res = await createMapAction({ accessToken: token, title: name })
     if (!res.ok || !res.map) throw new Error(res.error ?? '지도를 만들지 못했어요')
-    const nm: MyMapDetail = {
-      mapId: res.map.mapId,
-      title: res.map.title,
-      shareToken: res.map.shareToken,
-      pins: [],
-    }
-    setMaps((ms) => [...ms, nm])
-    setSelectedId(nm.mapId)
+    const created = res.map
+    setMaps((ms) => [...ms, created])
+    setPinsByMap((m) => ({ ...m, [created.mapId]: [] })) // 새 지도는 빈 핀 — 조회 불필요
+    setSelectedId(created.mapId)
     setCreateOpen(false)
-    pushMapUrl(nm.mapId)
+    pushMapUrl(created.mapId)
   }
 
   async function renameMap(name: string) {
@@ -154,11 +185,20 @@ export default function MyMapClient() {
       return
     }
     setConfirmDelete(false)
-    const remaining = maps.filter((m) => m.mapId !== selectedId)
+    const removedId = selectedId
+    const remaining = maps.filter((m) => m.mapId !== removedId)
     setMaps(remaining)
-    const next = remaining[0]?.mapId ?? null
-    setSelectedId(next)
-    if (next) pushMapUrl(next)
+    setPinsByMap((m) => {
+      const next = { ...m }
+      delete next[removedId]
+      return next
+    })
+    const nextId = remaining[0]?.mapId ?? null
+    setSelectedId(nextId)
+    if (nextId) {
+      pushMapUrl(nextId)
+      if (!pinsByMap[nextId] && token) void fetchPins(nextId, token)
+    }
   }
 
   async function copyShareLink() {
@@ -192,7 +232,7 @@ export default function MyMapClient() {
           size="sm"
           onClick={() => {
             setStatus('loading')
-            void load(selectedId ?? undefined)
+            void loadList(selectedId ?? undefined)
           }}
         >
           다시 시도
@@ -211,7 +251,7 @@ export default function MyMapClient() {
           “+ 장소 추가”로 직접 담거나, 인스타 링크로 찾아 담아보세요.
         </p>
         <div className="mt-1 flex items-center gap-2">
-          <AddPlaceDialog onAdded={() => load()} triggerVariant="default" />
+          <AddPlaceDialog onAdded={() => loadList()} triggerVariant="default" />
           <Link href="/" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
             링크로 찾기
           </Link>
@@ -220,7 +260,7 @@ export default function MyMapClient() {
     )
   }
 
-  const items: ExplorerItem[] = (selected?.pins ?? []).map((p) => ({
+  const items: ExplorerItem[] = (currentPins ?? []).map((p) => ({
     id: p.pinId,
     name: p.name,
     lat: p.lat,
@@ -232,7 +272,14 @@ export default function MyMapClient() {
     instaCodes: p.instaCodes,
   }))
 
-  const pinCount = selected?.pins.length ?? 0
+  // 선택 지도 핀이 아직 없음 = 로딩 중 또는 에러(에러는 안내문구로 표시, 재선택 시 재시도)
+  const pinsLoading = currentPins === undefined
+  const loadingText =
+    pinsError?.mapId === selectedId
+      ? `${pinsError.msg} — 지도를 다시 선택하면 재시도해요`
+      : '지도를 불러오는 중…'
+
+  const pinCount = selected?.pinCount ?? 0
   const canDelete = maps.length > 1
 
   const header = (
@@ -259,7 +306,7 @@ export default function MyMapClient() {
                 m.mapId === selectedId ? 'text-primary-foreground/80' : 'text-muted-foreground/70',
               )}
             >
-              {m.pins.length}
+              {m.pinCount}
             </span>
           </button>
         ))}
@@ -289,10 +336,7 @@ export default function MyMapClient() {
         <p className="text-sm text-muted-foreground">담은 장소 {pinCount}곳</p>
 
         <div className="flex flex-wrap items-center gap-2">
-          <AddPlaceDialog
-            mapId={selectedId ?? undefined}
-            onAdded={() => load(selectedId ?? undefined)}
-          />
+          <AddPlaceDialog mapId={selectedId ?? undefined} onAdded={() => reloadSelectedPins()} />
           <Button type="button" variant="outline" size="sm" onClick={copyShareLink}>
             {copied ? '✓ 링크 복사됨' : '공유 링크 복사'}
           </Button>
@@ -349,6 +393,8 @@ export default function MyMapClient() {
         allTags={[]}
         basePath="/my"
         filtered={false}
+        loading={pinsLoading}
+        loadingText={loadingText}
         emptyText="이 지도엔 아직 담은 장소가 없어요. “+ 장소 추가”로 담아보세요."
         renderItemAction={(item) => <RemovePinButton onRemove={() => removePin(item.id)} />}
       />
