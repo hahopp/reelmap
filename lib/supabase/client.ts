@@ -12,6 +12,15 @@ export function getBrowserSupabase(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!url || !anon) throw new Error('Supabase 환경변수가 없습니다')
-  browserClient = createClient(url, anon)
+  browserClient = createClient(url, anon, {
+    auth: {
+      // PKCE: OAuth/linkIdentity 복귀 시 ?code 를 즉시 세션으로 교환 → 익명→영구 승격이 복귀 직후 바로 반영.
+      // (기본값 implicit 는 링크 복귀에서 새 토큰을 즉시 안 줘, 모바일 등 첫 로그인 직후 로그인 표시가 누락됨)
+      flowType: 'pkce',
+      detectSessionInUrl: true,
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  })
   return browserClient
 }
