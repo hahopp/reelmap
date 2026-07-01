@@ -48,6 +48,7 @@ function toItem(p: PinRow): ExplorerItem {
     tags: p.tags,
     note: p.note,
     instaCodes: p.instaCodes,
+    contentId: p.contentId,
     editable: p.editable ?? false,
   }
 }

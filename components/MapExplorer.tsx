@@ -111,6 +111,10 @@ export default function MapExplorer({
                 : saveable && p.placeId
                   ? <SavePlaceButton placeId={p.placeId} contentId={p.contentId ?? null} />
                   : null
+              // 이 장소에 연결된 인스타 = 등록된 후보들(instaCodes) + 이 핀의 출처 릴(contentId). 중복 제거.
+              const instaLinks = Array.from(
+                new Set([...(p.instaCodes ?? []), ...(p.contentId ? [p.contentId] : [])]),
+              )
               return (
               <li key={p.id} id={`pin-${p.id}`} className="relative">
                 {action && (
@@ -150,7 +154,7 @@ export default function MapExplorer({
                   </CardHeader>
                   {(p.note ||
                     p.tags.length > 0 ||
-                    (p.instaCodes && p.instaCodes.length > 0) ||
+                    instaLinks.length > 0 ||
                     (p.mapNames && p.mapNames.length > 0)) && (
                     <CardContent className="flex flex-col gap-2">
                       {p.mapNames && p.mapNames.length > 0 && (
@@ -178,20 +182,20 @@ export default function MapExplorer({
                           ))}
                         </div>
                       )}
-                      {p.instaCodes && p.instaCodes.length > 0 && (
+                      {instaLinks.length > 0 && (
                         <div className="flex flex-wrap items-center gap-1.5">
-                          {p.instaCodes.map((code) => (
+                          {instaLinks.map((code, idx) => (
                             <a
                               key={code}
                               href={`https://www.instagram.com/p/${code}/`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              aria-label="인스타그램에서 보기"
                               title="인스타그램에서 보기"
                               onClick={(e) => e.stopPropagation()}
-                              className="inline-flex size-9 items-center justify-center rounded-full border bg-card text-muted-foreground transition hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                              className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-2 text-xs font-medium text-foreground/80 transition hover:border-primary hover:text-primary focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
                             >
                               <InstagramIcon className="size-4" />
+                              {instaLinks.length > 1 ? `인스타 ${idx + 1}` : '인스타에서 보기'}
                             </a>
                           ))}
                         </div>
