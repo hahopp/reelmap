@@ -18,6 +18,7 @@ export type ExplorerItem = {
   tags: string[]
   note?: string | null
   instaCodes?: string[]
+  ownInstaCodes?: string[] // 내가 등록한 릴만(instaScope='own'일 때 카드 표시에 사용)
   placeId?: string // 담기용(공개 지도/탐색) · 편집용(내 지도)
   contentId?: string | null // 출처 릴(있으면 담을 때 그 후보에 투표)
   mapNames?: string[] // 소속 지도명(내 지도 "전체 보기"에서 어느 지도의 장소인지)
@@ -40,6 +41,7 @@ export default function MapExplorer({
   loading = false,
   renderItemAction,
   saveable = false,
+  instaScope = 'all',
 }: {
   header: ReactNode
   items: ExplorerItem[]
@@ -55,6 +57,8 @@ export default function MapExplorer({
   renderItemAction?: (item: ExplorerItem) => ReactNode
   /** true면 placeId 있는 항목 우상단에 "담기" 버튼 표시(공개 지도/탐색용). renderItemAction 이 우선. */
   saveable?: boolean
+  /** 카드 인스타 버튼 범위 — 'all'(전부, 공개·탐색) / 'own'(내가 등록한 릴만, 내 지도). 항상 이 핀 출처 릴(contentId)은 포함. */
+  instaScope?: 'all' | 'own'
 }) {
   const [focus, setFocus] = useState<{ lat: number; lng: number } | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -111,9 +115,10 @@ export default function MapExplorer({
                 : saveable && p.placeId
                   ? <SavePlaceButton placeId={p.placeId} contentId={p.contentId ?? null} />
                   : null
-              // 이 장소에 연결된 인스타 = 등록된 후보들(instaCodes) + 이 핀의 출처 릴(contentId). 중복 제거.
+              // 카드에 보일 인스타 = 범위별 코드(all=전부 / own=내가 등록한 것) + 이 핀의 출처 릴. 중복 제거.
+              const baseCodes = instaScope === 'own' ? (p.ownInstaCodes ?? []) : (p.instaCodes ?? [])
               const instaLinks = Array.from(
-                new Set([...(p.instaCodes ?? []), ...(p.contentId ? [p.contentId] : [])]),
+                new Set([...baseCodes, ...(p.contentId ? [p.contentId] : [])]),
               )
               return (
               <li key={p.id} id={`pin-${p.id}`} className="relative">

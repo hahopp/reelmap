@@ -15,6 +15,8 @@ export interface PinRow {
   lng: number
   tags: string[]
   instaCodes: string[]
+  /** 이 중 내가 등록(submission)한 릴만 — 내 지도 카드 '내 것만' 표시용. 미설정 시 비움. */
+  ownInstaCodes?: string[]
   contentId: string | null
   note: string | null
   /** 이 장소를 내가 만들었나(place.created_by=나) → 태그·릴 링크 편집 가능. 미설정 시 불가. */

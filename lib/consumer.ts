@@ -509,15 +509,29 @@ export async function getMyMapsWithPins(accessToken: string): Promise<MyMapDetai
     tags: string[] | null
     created_by: string | null
   }
-  const [placesRes, codesByPlace] = await Promise.all([
+  const [placesRes, codesByPlace, mySubsRes] = await Promise.all([
     db
       .from('place')
       .select('id, name, road_address, address, lat, lng, tags, created_by')
       .in('id', placeIds),
     instaCodesByPlace(db, placeIds),
+    // 내가 등록한 릴만(내 지도 카드 '내 것만' 표시) — 내가 제출한 submission 의 content_id
+    db
+      .from('submission')
+      .select('place_id, content_id')
+      .in('place_id', placeIds)
+      .eq('submitted_by', appUserId)
+      .neq('status', 'hidden'),
   ])
   if (placesRes.error) throw new Error('place 조회: ' + placesRes.error.message)
   const placeById = new Map(((placesRes.data ?? []) as PlaceRow[]).map((p) => [p.id, p]))
+
+  const myCodesByPlace = new Map<string, string[]>()
+  for (const s of (mySubsRes.data ?? []) as { place_id: string; content_id: string }[]) {
+    const arr = myCodesByPlace.get(s.place_id) ?? []
+    arr.push(s.content_id)
+    myCodesByPlace.set(s.place_id, arr)
+  }
 
   // 핀을 지도별로 묶기(map_pin은 이미 최근순 정렬)
   const pinsByMap = new Map<string, PinRow[]>()
@@ -533,6 +547,7 @@ export async function getMyMapsWithPins(accessToken: string): Promise<MyMapDetai
       lng: (pl?.lng as number) ?? 0,
       tags: (pl?.tags as string[] | null) ?? [],
       instaCodes: codesByPlace.get(p.place_id as string) ?? [],
+      ownInstaCodes: myCodesByPlace.get(p.place_id as string) ?? [],
       contentId: (p.content_id as string | null) ?? null,
       note: (p.note as string | null) ?? null,
       editable: pl?.created_by != null && pl.created_by === appUserId,

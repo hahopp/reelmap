@@ -48,6 +48,7 @@ function toItem(p: PinRow): ExplorerItem {
     tags: p.tags,
     note: p.note,
     instaCodes: p.instaCodes,
+    ownInstaCodes: p.ownInstaCodes,
     contentId: p.contentId,
     editable: p.editable ?? false,
   }
@@ -417,6 +418,7 @@ export default function MyMapClient() {
         allTags={[]}
         basePath="/my"
         filtered={false}
+        instaScope="own"
         emptyText={
           isAll
             ? '아직 담은 장소가 없어요. 지도를 골라 “+ 장소 추가”로 담아보세요.'
